@@ -9,10 +9,10 @@ import pytest
 import requests
 
 
-from zenbase.omakase.langsmith import LangSmithZen
-from zenbase.optimizers.labeled_few_shot import LabeledFewShot
-from zenbase.functional import LMRequest, deflm
-from zenbase.numerical import amaximize_score, maximize_score
+from zenbase.helpers.langchain import ZenLangSmith
+from zenbase.optim.labeled_few_shot import LabeledFewShot
+from zenbase.types import LMRequest, deflm
+from zenbase.train.metric import maximize_score
 
 TESTSET_SIZE = 5
 SAMPLE_SIZE = 2
@@ -29,7 +29,6 @@ def langsmith():
 
 
 @pytest.fixture
-@pytest.mark.vcr
 def test_examples(gsm8k_dataset: DatasetDict, langsmith: Client):
     try:
         return list(langsmith.list_examples(dataset_name="gsm8k-test-examples"))
@@ -58,11 +57,13 @@ def score_answer(run: Run, example: Example) -> bool:
 
 @pytest.mark.asyncio
 @pytest.mark.vcr
+@pytest.mark.helpers
 async def test_lcel_labeled_few_shot(
     langsmith: Client,
     test_examples: list,
     golden_demos: list,
 ):
+    @deflm
     @traceable
     def optimize_lcel(request: LMRequest):
         from langchain_openai import ChatOpenAI
@@ -93,9 +94,9 @@ async def test_lcel_labeled_few_shot(
         return {"answer": answer}
 
     result = maximize_score(
-        optimize_lcel,
-        LabeledFewShot.candidates(demos=golden_demos, samples=SAMPLE_SIZE),
-        LangSmithZen.evaluate(
+        function=optimize_lcel,
+        optimizer=LabeledFewShot(golden_demos, samples=SAMPLE_SIZE),
+        evaluator=ZenLangSmith.metric_evaluator(
             test_examples,
             evaluators=[score_answer],
             client=langsmith,
@@ -108,12 +109,14 @@ async def test_lcel_labeled_few_shot(
 
 @pytest.mark.asyncio
 @pytest.mark.vcr
+@pytest.mark.helpers
 async def test_openai_json_response_labeled_few_shot(
     langsmith: Client,
     golden_demos: list,
     test_examples: list,
     openai: AsyncOpenAI,
 ):
+    @deflm
     @traceable
     async def optimize_openai_json_response(request: LMRequest) -> dict:
         messages = [
@@ -138,12 +141,14 @@ async def test_openai_json_response_labeled_few_shot(
 
         return json.loads(response.choices[0].message.content)
 
-    result = LangSmithZen.maximize_score(
-        lmfunction=optimize_openai_json_response,
-        candidates=LabeledFewShot.candidates(demos=golden_demos, samples=SAMPLE_SIZE),
-        data=test_examples,
-        evaluators=[score_answer],
-        client=langsmith,
+    result = maximize_score(
+        function=optimize_openai_json_response,
+        optimizer=LabeledFewShot(golden_demos, samples=SAMPLE_SIZE),
+        evaluator=ZenLangSmith.metric_evaluator(
+            test_examples,
+            evaluators=[score_answer],
+            client=langsmith,
+        ),
     )
 
     assert result.function is not None

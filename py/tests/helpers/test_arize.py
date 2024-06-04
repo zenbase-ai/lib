@@ -3,10 +3,9 @@ from openai import AsyncOpenAI
 import pandas as pd
 import pytest
 
-from zenbase.omakase.arize import PhoenixZen
-from zenbase.optimizers.labeled_few_shot import LabeledFewShot
-from zenbase.functional import LMDemo, LMRequest
-from zenbase.numerical import maximize_score
+from zenbase.helpers.arize import ZenPhoenix
+from zenbase.optim.labeled_few_shot import LabeledFewShot
+from zenbase.types import LMDemo, LMRequest
 
 TEST_SIZE = 5
 SAMPLE_SIZE = 2
@@ -31,6 +30,7 @@ def test_examples_df(gsm8k_dataset: DatasetDict) -> pd.DataFrame:
 
 @pytest.mark.asyncio
 @pytest.mark.vcr
+@pytest.mark.helpers
 async def test_arize_phoenix_labeled_few_shot(
     test_examples_df: pd.DataFrame,
     golden_demos_df: pd.DataFrame,
@@ -66,8 +66,8 @@ async def test_arize_phoenix_labeled_few_shot(
 
     optimized_function, run = await LabeledFewShot.maximize_score(
         function,
-        demos=PhoenixZen.demos(golden_demos_df),
-        evaluator=PhoenixZen.metric_evaluator(
+        demos=ZenPhoenix.demos(golden_demos_df),
+        evaluator=ZenPhoenix.metric_evaluator(
             evaluator,
             testset=test_examples_df,
             concurrency=20,

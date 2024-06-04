@@ -1,40 +1,44 @@
-from copy import copy
-from functools import partial
-from pydantic import BaseModel, Field
-from typing import Any, Awaitable, Callable
 from collections import deque
+from copy import copy
+from dataclasses import dataclass, field, replace
+from functools import partial
+from typing import Awaitable, Callable
 import inspect
 
-from metadict import MetaDict
-from pksuid import PKSUID
+
+from zenbase.utils import asyncify, id_gen, syncify
 
 
-from zenbase.asyncio import asyncify, syncify
-
-
-class LMDemo[Params: dict, Response: dict](BaseModel):
+@dataclass(frozen=True)
+class LMDemo[Params: dict, Response: dict]:
     params: Params
     response: Response
 
-
-class LMZenbase[Params: dict, Response: dict](BaseModel):
-    instructions: list[str] = Field(default_factory=list)
-    dos: list[str] = Field(default_factory=list)
-    donts: list[str] = Field(default_factory=list)
-    demos: list[LMDemo[Params, Response]] = Field(default_factory=list)
+    def __hash__(self):
+        return hash((frozenset(self.params.items()), frozenset(self.response.items())))
 
 
-class LMRequest[Params: dict, Response: dict](BaseModel):
-    id: PKSUID = Field(default_factory=partial(PKSUID, "request"))
+@dataclass(frozen=True)
+class LMZenbase[Params: dict, Response: dict]:
+    instructions: list[str] = field(default_factory=list)
+    dos: list[str] = field(default_factory=list)
+    donts: list[str] = field(default_factory=list)
+    demos: list[LMDemo[Params, Response]] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class LMRequest[Params: dict, Response: dict]:
     zenbase: LMZenbase[Params, Response]
-    params: Params = Field(default_factory=MetaDict)
+    params: Params = field(default_factory=dict)
+    id: str = field(default_factory=id_gen("request"))
 
 
-class LMFunctionCall[Params: dict, Response: dict](BaseModel):
+@dataclass(frozen=True)
+class LMCall[Params: dict, Response: dict]:
     function: "LMFunction[Params, Response]"
     request: LMRequest[Params, Response]
     response: Response
-    id: PKSUID = Field(default_factory=partial(PKSUID, "call"))
+    id: str = field(default_factory=id_gen("call"))
 
 
 type LMCallable[Params: dict, Response] = Callable[
@@ -44,23 +48,25 @@ type LMCallable[Params: dict, Response] = Callable[
 
 
 class LMFunction[Params: dict, Response: dict]:
-    id: PKSUID
+    gen_id = staticmethod(id_gen("fn"))
+
+    id: str
     sync_fn: LMCallable[Params, Response]
     async_fn: LMCallable[Params, Awaitable[Response]]
     __name__: str
     __qualname__: str
     __doc__: str
     __signature__: inspect.Signature
-    zenbase: LMZenbase[Params, Response]
-    history: deque[LMFunctionCall[Params, Response]]
+    zenbase: LMZenbase
+    history: deque[LMCall[Params, Response]]
 
     def __init__(
         self,
         fn: LMCallable[Params, Response] | LMCallable[Params, Awaitable[Response]],
-        request_defaults: LMRequest[Params, Response] | None = None,
+        zenbase: LMZenbase | None = None,
         maxhistory: int = 128,
     ):
-        self.id = PKSUID("fn")
+        self.id = self.gen_id()
         self.sync_fn = syncify(fn)
         self.async_fn = asyncify(fn)
 
@@ -69,15 +75,15 @@ class LMFunction[Params: dict, Response: dict]:
         self.__doc__ = getattr(fn, "__doc__", "")
         self.__signature__ = inspect.signature(fn)
 
-        self.zenbase = request_defaults or LMRequest()
+        self.zenbase = zenbase or LMZenbase()
         self.history = deque([], maxlen=maxhistory)
 
     def refine(
-        self, zenbase: LMZenbase[Params, Response] | None = None
+        self, zenbase: LMZenbase | None = None
     ) -> "LMFunction[Params, Response]":
         dup = copy(self)
-        dup.id = PKSUID("fn")
-        dup.zenbase = zenbase or self.zenbase.model_copy()
+        dup.id = self.gen_id()
+        dup.zenbase = zenbase or replace(self.zenbase)
         dup.history = deque([], maxlen=self.history.maxlen)
         return dup
 
@@ -88,7 +94,7 @@ class LMFunction[Params: dict, Response: dict]:
         self, request: LMRequest[Params, Response], response: Response
     ) -> Response:
         self.history.append(
-            LMFunctionCall(
+            LMCall(
                 function=self,
                 request=request,
                 response=response,
@@ -98,13 +104,13 @@ class LMFunction[Params: dict, Response: dict]:
 
     async def __call__(
         self,
-        params: Params,
+        params: Params = {},
     ) -> Response:
         request = self.prepare_request(params)
         response = await self.async_fn(request)
         return self.process_response(request, response)
 
-    def call_sync(self, params: Params) -> Response:
+    def call_sync(self, params: Params = {}) -> Response:
         request = self.prepare_request(params)
         response = self.sync_fn(request)
         return self.process_response(request, response)
@@ -127,6 +133,3 @@ def deflm[
         return function.refine()
 
     return LMFunction(function, request_defaults, maxhistory)
-
-
-LMFunctionCall.model_rebuild()

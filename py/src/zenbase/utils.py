@@ -1,0 +1,106 @@
+from anyio._core._eventloop import threadlocals
+from typing import AsyncIterable, Awaitable, Callable, ParamSpec, TypeVar
+import anyio
+import asyncio
+import functools
+import inspect
+import os
+
+from pksuid import PKSUID
+from faker import Faker
+
+
+def get_seed(seed: int | None = None) -> int:
+    return seed or int(os.getenv("RANDOM_SEED", 42))
+
+
+def id_gen(prefix: str) -> Callable[[], str]:
+    return lambda: str(PKSUID(prefix))
+
+
+def random_name_gen(
+    prefix: str | None = None,
+    random_name_generator=Faker().catch_phrase,
+) -> Callable[[], str]:
+    head = f"zenbase-{prefix}" if prefix else "zenbase"
+    tail = random_name_generator().lower().replace(" ", "-")
+    return f"{head}-{tail}"
+
+
+I_ParamSpec = ParamSpec("I_ParamSpec")
+O_Retval = TypeVar("O_Retval")
+
+
+def asyncify(
+    func: Callable[I_ParamSpec, O_Retval],
+    *,
+    cancellable: bool = True,
+    limiter: anyio.CapacityLimiter | None = None,
+) -> Callable[I_ParamSpec, O_Retval]:
+    if inspect.iscoroutinefunction(func):
+        return func
+
+    async def wrapper(
+        *args: I_ParamSpec.args, **kwargs: I_ParamSpec.kwargs
+    ) -> O_Retval:
+        partial_f = functools.partial(func, *args, **kwargs)
+        return await anyio.to_thread.run_sync(
+            partial_f,
+            abandon_on_cancel=cancellable,
+            limiter=limiter,
+        )
+
+    return wrapper
+
+
+def syncify(
+    func: Callable[I_ParamSpec, O_Retval],
+) -> Callable[I_ParamSpec, O_Retval]:
+    if not inspect.iscoroutinefunction(func):
+        return func
+
+    @functools.wraps(func)
+    def wrapper(*args: I_ParamSpec.args, **kwargs: I_ParamSpec.kwargs) -> O_Retval:
+        current_async_module = (
+            getattr(threadlocals, "current_async_backend", None)
+            or
+            # TODO: remove when deprecating AnyIO 3.x
+            getattr(threadlocals, "current_async_module", None)
+        )
+        partial_f = functools.partial(func, *args, **kwargs)
+        if current_async_module is None:
+            return anyio.run(partial_f)
+        return anyio.from_thread.run(partial_f)
+
+    return wrapper
+
+
+async def amap[
+    O
+](func: Callable[..., Awaitable[O]], iterable, *iterables, concurrency=20) -> list[O]:
+    assert concurrency >= 1, "Concurrency must be greater than or equal to 1"
+
+    if concurrency == 1:
+        return [await func(*args) for args in zip(iterable, *iterables)]
+
+    if concurrency == float("inf"):
+        return await asyncio.gather(
+            *[func(*args) for args in zip(iterable, *iterables)]
+        )
+
+    semaphore = asyncio.Semaphore(concurrency)
+
+    @functools.wraps(func)
+    async def mapper(*args):
+        async with semaphore:
+            return await func(*args)
+
+    return await asyncio.gather(*[mapper(*args) for args in zip(iterable, *iterables)])
+
+
+def pmap[O](func: Callable[..., O], iterable, *iterables, concurrency=20) -> list[O]:
+    return syncify(amap)(asyncify(func), iterable, *iterables, concurrency)
+
+
+async def alist[O](aiterable: AsyncIterable[O]) -> list[O]:
+    return [x async for x in aiterable]

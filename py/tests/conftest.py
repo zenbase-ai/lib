@@ -1,7 +1,16 @@
 from datasets import DatasetDict
 import pytest
 
-from zenbase.functional import LMDemo
+from zenbase.types import LMDemo
+
+
+def pytest_addoption(parser: pytest.Parser):
+    parser.addoption("--helpers", action="store_true", help="run helpers tests")
+
+
+def pytest_runtest_setup(item: pytest.Item):
+    if "helpers" in item.keywords and not item.config.getoption("--helpers"):
+        pytest.skip("skipping integration tests")
 
 
 @pytest.fixture(scope="session", autouse=True)
