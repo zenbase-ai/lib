@@ -1,4 +1,7 @@
+from datasets import DatasetDict
 import pytest
+
+from zenbase.functional import LMDemo
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -7,13 +10,6 @@ def env():
     from dotenv import load_dotenv
 
     load_dotenv(str(Path(__file__).parent.parent / ".env.test"))
-
-
-@pytest.fixture
-def gsm8k_dataset():
-    import datasets
-
-    return datasets.load_dataset("gsm8k", "main")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -32,3 +28,21 @@ def vcr_config():
         "match_on": ["method", "scheme", "host", "port", "path", "query"],
         "record_mode": "new_episodes",
     }
+
+
+@pytest.fixture
+def gsm8k_dataset():
+    import datasets
+
+    return datasets.load_dataset("gsm8k", "main")
+
+
+@pytest.fixture
+def golden_demos(gsm8k_dataset: DatasetDict) -> list[LMDemo]:
+    return [
+        LMDemo(
+            params={"question": r["question"]},
+            response={"answer": r["answer"]},
+        )
+        for r in gsm8k_dataset["train"].select(range(5))
+    ]

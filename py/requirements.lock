@@ -8,6 +8,8 @@
 #   with-sources: false
 
 -e file:.
+annotated-types==0.7.0
+    # via pydantic
 anyio==4.4.0
     # via asyncer
 asttokens==2.4.1
@@ -20,11 +22,24 @@ idna==3.7
     # via anyio
 littleutils==0.2.2
     # via sorcery
+metadict==0.1.3
+    # via zenbase
+pksuid==1.1.2
+    # via zenbase
+pybase62==0.4.3
+    # via pksuid
+pydantic==2.7.3
+    # via zenbase
+pydantic-core==2.18.4
+    # via pydantic
 six==1.16.0
     # via asttokens
 sniffio==1.3.1
     # via anyio
 sorcery==0.2.2
     # via zenbase
+typing-extensions==4.12.1
+    # via pydantic
+    # via pydantic-core
 wrapt==1.16.0
     # via sorcery

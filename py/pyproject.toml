@@ -6,6 +6,9 @@ authors = [{ name = "Cyrus Nouroozi", email = "cyrus@zenbase.ai" }]
 dependencies = [
     "asyncer>=0.0.7",
     "sorcery>=0.2.2",
+    "pksuid>=1.1.2",
+    "metadict>=0.1.3",
+    "pydantic>=2.7.3",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -35,6 +38,10 @@ dev-dependencies = [
     "nest-asyncio>=1.6.0",
     "langchain-openai>=0.1.8",
     "langchain-core>=0.2.3",
+    "langchain>=0.2.1",
+    "parea-ai>=0.2.164",
+    "langfuse>=2.33.1",
+    "lunary>=1.0.30",
 ]
 
 [tool.hatch.metadata]
