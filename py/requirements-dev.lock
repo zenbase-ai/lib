@@ -282,7 +282,7 @@ langchain-openai==0.1.8
 langchain-text-splitters==0.2.0
     # via langchain
 langfuse==2.33.1
-langsmith==0.1.65
+langsmith==0.1.72
     # via langchain
     # via langchain-core
 levenshtein==0.25.1
@@ -520,9 +520,7 @@ pyright==1.1.365
 pysbd==0.3.4
     # via parea-ai
 pytest==8.2.1
-    # via pytest-asyncio
     # via pytest-recording
-pytest-asyncio==0.23.7
 pytest-recording==0.13.1
 python-dateutil==2.9.0.post0
     # via arrow

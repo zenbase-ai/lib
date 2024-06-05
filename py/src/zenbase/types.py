@@ -41,9 +41,13 @@ class LMCall[Params: dict, Response: dict]:
     id: str = field(default_factory=id_gen("call"))
 
 
-type LMCallable[Params: dict, Response] = Callable[
+type SyncDef[Params: dict, Response: dict] = Callable[
     [LMRequest[Params, Response]],
     Response,
+]
+type AsyncDef[Params: dict, Response: dict] = Callable[
+    [LMRequest[Params, Response]],
+    Awaitable[Response],
 ]
 
 
@@ -51,8 +55,7 @@ class LMFunction[Params: dict, Response: dict]:
     gen_id = staticmethod(id_gen("fn"))
 
     id: str
-    sync_fn: LMCallable[Params, Response]
-    async_fn: LMCallable[Params, Awaitable[Response]]
+    fn: SyncDef[Params, Response] | AsyncDef[Params, Response]
     __name__: str
     __qualname__: str
     __doc__: str
@@ -62,13 +65,12 @@ class LMFunction[Params: dict, Response: dict]:
 
     def __init__(
         self,
-        fn: LMCallable[Params, Response] | LMCallable[Params, Awaitable[Response]],
+        fn: SyncDef[Params, Response] | AsyncDef[Params, Response],
         zenbase: LMZenbase | None = None,
         maxhistory: int = 1,
     ):
         self.id = self.gen_id()
-        self.sync_fn = syncify(fn)
-        self.async_fn = asyncify(fn)
+        self.fn = fn
 
         self.__name__ = getattr(fn, "__name__", "zenbase_lm_fn")
         self.__qualname__ = getattr(fn, "__qualname__", "zenbase_lm_fn")
@@ -107,23 +109,13 @@ class LMFunction[Params: dict, Response: dict]:
         params: Params = {},
     ) -> Response:
         request = self.prepare_request(params)
-        response = await self.async_fn(request)
+        response = await asyncify(self.fn)(request)
         return self.process_response(request, response)
 
     def call_sync(self, params: Params = {}) -> Response:
         request = self.prepare_request(params)
-        response = self.sync_fn(request)
+        response = syncify(self.fn)(request)
         return self.process_response(request, response)
-
-
-type SyncDef[Params: dict, Response: dict] = Callable[
-    [LMRequest[Params, Response]],
-    Response,
-]
-type AsyncDef[Params: dict, Response: dict] = Callable[
-    [LMRequest[Params, Response]],
-    Awaitable[Response],
-]
 
 
 def deflm[
@@ -132,12 +124,11 @@ def deflm[
 ](
     function: SyncDef[Params, Response] | AsyncDef[Params, Response] | None = None,
     zenbase: LMRequest[Params, Response] | None = None,
-    maxhistory: int = 0,
 ) -> LMFunction[Params, Response]:
     if function is None:
-        return partial(deflm, zenbase=zenbase, maxhistory=maxhistory)
+        return partial(deflm, zenbase=zenbase)
 
     if isinstance(function, LMFunction):
-        return function.refine()
+        return function.refine(zenbase)
 
-    return LMFunction(function, zenbase, maxhistory)
+    return LMFunction(function, zenbase)

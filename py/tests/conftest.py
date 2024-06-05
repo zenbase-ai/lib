@@ -5,6 +5,17 @@ import pytest
 from zenbase.types import LMDemo
 
 
+def pytest_configure():
+    from dotenv import load_dotenv
+    from pathlib import Path
+
+    load_dotenv(str(Path(__file__).parent.parent / ".env.test"))
+
+    import nest_asyncio
+
+    nest_asyncio.apply()
+
+
 def pytest_addoption(parser: pytest.Parser):
     parser.addoption("--helpers", action="store_true", help="run helpers tests")
 
@@ -14,19 +25,9 @@ def pytest_runtest_setup(item: pytest.Item):
         pytest.skip("skipping integration tests")
 
 
-@pytest.fixture(scope="session", autouse=True)
-def env():
-    from pathlib import Path
-    from dotenv import load_dotenv
-
-    load_dotenv(str(Path(__file__).parent.parent / ".env.test"))
-
-
-@pytest.fixture(scope="session", autouse=True)
-def nest_asyncio():
-    import nest_asyncio
-
-    nest_asyncio.apply()
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -70,6 +71,7 @@ def vcr_config():
             "x-stainless-arch",
             "x-stainless-runtime",
             "x-stainless-runtime-version",
+            "x-api-key",
         ],
         "filter_query_parameters": ["api_key"],
         "cassette_library_dir": "tests/cache/cassettes",
@@ -105,15 +107,15 @@ def vcr_config():
     }
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def gsm8k_dataset():
     import datasets
 
     return datasets.load_dataset("gsm8k", "main")
 
 
-@pytest.fixture
-def golden_demos(gsm8k_dataset: DatasetDict) -> list[LMDemo]:
+@pytest.fixture(scope="session")
+def gsm8k_demoset(gsm8k_dataset: DatasetDict) -> list[LMDemo]:
     return [
         LMDemo(
             params={"question": r["question"]},

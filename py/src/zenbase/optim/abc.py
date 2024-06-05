@@ -14,10 +14,10 @@ class LMOptim[Params: dict, Response: dict](ABC):
     events: AsyncIOEventEmitter = field(default_factory=AsyncIOEventEmitter)
 
     @abstractmethod
-    def compile(self, function: LMFunction[Params, Response], *args, **kwargs):
-        return syncify(alist)(self.acompile(function, *args, **kwargs))
+    def train(self, function: LMFunction[Params, Response], *args, **kwargs):
+        return syncify(alist)(self.atrain(function, *args, **kwargs))
 
     @abstractmethod
-    async def acompile(
+    async def atrain(
         self, function: LMFunction[Params, Response], *args, **kwargs
     ) -> LMFunction[Params, Response]: ...

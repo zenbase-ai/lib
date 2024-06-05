@@ -1,10 +1,11 @@
+from dataclasses import asdict
 from typing import TYPE_CHECKING, Iterator
 
 from zenbase.types import LMDemo, LMFunction
 from zenbase.optim.metric.types import (
     MetricEvals,
-    MetricExperimentResult,
-    MetricExperimentEvaluator,
+    CandidateMetricResult,
+    CandidateMetricEvaluator,
 )
 from zenbase.utils import random_name_gen
 
@@ -20,7 +21,7 @@ class ZenLangSmith:
     @classmethod
     def metric_evaluator[
         Params: dict, Response: dict
-    ](cls, **evaluate_kwargs) -> MetricExperimentEvaluator:
+    ](cls, **evaluate_kwargs) -> CandidateMetricEvaluator:
         from langsmith import evaluate
 
         metadata = evaluate_kwargs.pop("metadata", {})
@@ -28,15 +29,15 @@ class ZenLangSmith:
             evaluate_kwargs.pop("experiment_prefix", None)
         )
 
-        def run_experiment(
+        def evaluate_candidate(
             function: LMFunction[Params, Response],
-        ) -> MetricExperimentResult[Params, Response]:
+        ) -> CandidateMetricResult[Params, Response]:
             experiment_results = evaluate(
                 function.call_sync,
                 experiment_prefix=gen_random_name(),
                 metadata={
                     **metadata,
-                    **dict(function.zenbase),
+                    **asdict(function.zenbase),
                 },
                 **evaluate_kwargs,
             )
@@ -46,9 +47,9 @@ class ZenLangSmith:
             else:
                 evals = cls._experiment_results_to_evals(experiment_results)
 
-            return MetricExperimentResult(function, evals)
+            return CandidateMetricResult(function, evals)
 
-        return run_experiment
+        return evaluate_candidate
 
     @staticmethod
     def _experiment_results_to_evals(experiment_results: list) -> MetricEvals:

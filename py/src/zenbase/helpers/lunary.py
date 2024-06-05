@@ -2,8 +2,8 @@ import lunary
 
 from zenbase.optim.metric.types import (
     MetricEvals,
-    MetricExperimentResult,
-    ExperimentRunner,
+    CandidateMetricResult,
+    CandidateMetricEvaluator,
 )
 from zenbase.types import LMDemo, LMFunction
 from zenbase.utils import pmap
@@ -24,10 +24,10 @@ class ZenLunary:
         evalset: list[lunary.DatasetItem],
         concurrency: int = 20,
         **kwargs,
-    ) -> ExperimentRunner:
-        def run_experiment(
+    ) -> CandidateMetricEvaluator:
+        def evaluate_metric(
             function: LMFunction[Params, Response]
-        ) -> MetricExperimentResult[Params, Response]:
+        ) -> CandidateMetricResult[Params, Response]:
             def run_and_evaluate(item: lunary.DatasetItem):
                 response = function.call_sync({"input": item.input})
                 passed, results = lunary.evaluate(
@@ -46,6 +46,6 @@ class ZenLunary:
                 concurrency=concurrency,
             )
 
-            return MetricExperimentResult(function, evals)
+            return CandidateMetricResult(function, evals)
 
-        return run_experiment
+        return evaluate_metric

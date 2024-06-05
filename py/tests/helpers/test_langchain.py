@@ -1,35 +1,47 @@
 import json
+import logging
 
 from datasets import DatasetDict
 from langsmith import Client, traceable
 from langsmith.schemas import Run, Example
 from langsmith.wrappers import wrap_openai
 from openai import AsyncOpenAI
+from tenacity import (
+    before_sleep_log,
+    retry,
+    stop_after_attempt,
+    wait_exponential_jitter,
+)
 import pytest
 import requests
-
 
 from zenbase.helpers.langchain import ZenLangSmith
 from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
 from zenbase.types import LMRequest, deflm
-from zenbase.optim.metric.types import maximize_score
 
 TESTSET_SIZE = 5
-SAMPLE_SIZE = 2
+BATCH_SIZE = 2
+
+log = logging.getLogger(__name__)
 
 
 @pytest.fixture
+def optim(gsm8k_demoset: list):
+    return LabeledFewShot(demoset=gsm8k_demoset, shots=3)
+
+
+@pytest.fixture(scope="module")
 def openai():
     return wrap_openai(AsyncOpenAI())
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def langsmith():
     return Client()
 
 
-@pytest.fixture
-def test_examples(gsm8k_dataset: DatasetDict, langsmith: Client):
+@pytest.fixture(scope="module")
+def testset(gsm8k_dataset: DatasetDict, langsmith: Client):
     try:
         return list(langsmith.list_examples(dataset_name="gsm8k-test-examples"))
     except requests.exceptions.HTTPError as e:
@@ -55,15 +67,18 @@ def score_answer(run: Run, example: Example) -> bool:
     }
 
 
-@pytest.mark.asyncio
-@pytest.mark.vcr
 @pytest.mark.helpers
-async def test_lcel_labeled_few_shot(
+def test_langsmith_lcel_labeled_few_shot(
     langsmith: Client,
-    test_examples: list,
-    golden_demos: list,
+    optim: LabeledFewShot,
+    testset: list,
 ):
     @deflm
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(max=8),
+        before_sleep=before_sleep_log(log, logging.WARN),
+    )
     @traceable
     def optimize_lcel(request: LMRequest):
         from langchain_openai import ChatOpenAI
@@ -90,45 +105,56 @@ async def test_lcel_labeled_few_shot(
             | StrOutputParser()
         )
 
+        print("Mathing...")
         answer = chain.invoke(request.params)
         return {"answer": answer}
 
-    result = maximize_score(
-        function=optimize_lcel,
-        optimizer=LabeledFewShot(golden_demos, samples=SAMPLE_SIZE),
+    scores = []
+    optim.events.on("experiment", lambda r: scores.append(r.evals["score"]))
+
+    fn = optim.train(
+        optimize_lcel,
         evaluator=ZenLangSmith.metric_evaluator(
-            test_examples,
+            data=testset,
             evaluators=[score_answer],
             client=langsmith,
+            max_concurrency=2,
         ),
+        batch_size=BATCH_SIZE,
+        epochs=1,
     )
 
-    assert result.function is not None
-    assert len(result.experiments) == SAMPLE_SIZE
+    assert fn is not None
+    assert any(scores)
+    assert next(s for s in scores if s >= 0.5)
 
 
-@pytest.mark.asyncio
-@pytest.mark.vcr
+@pytest.mark.anyio
 @pytest.mark.helpers
-async def test_openai_json_response_labeled_few_shot(
+async def test_langsmith_openai_json_response_labeled_few_shot(
     langsmith: Client,
-    golden_demos: list,
-    test_examples: list,
     openai: AsyncOpenAI,
+    optim: LabeledFewShot,
+    testset: list,
 ):
     @deflm
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential_jitter(max=8),
+        before_sleep=before_sleep_log(log, logging.WARN),
+    )
     @traceable
     async def optimize_openai_json_response(request: LMRequest) -> dict:
         messages = [
             {
                 "role": "system",
-                "content": "You are an expert math solver. Your answer must be just the number with no separators, and nothing else. Follow the format of the examples. Respond with a JSON object.",
+                "content": "You are an expert math solver. Your answer must be just the number with no separators, and nothing else. Follow the format of the examples. Think step by step. Respond with a JSON object.",
             },
         ]
-        for example in request.zenbase.demos:
+        for demo in request.zenbase.demos:
             messages += [
-                {"role": "user", "content": json.dumps(example["inputs"])},
-                {"role": "assistant", "content": json.dumps(example["outputs"])},
+                {"role": "user", "content": json.dumps(demo.params)},
+                {"role": "assistant", "content": json.dumps(demo.response)},
             ]
         messages.append({"role": "user", "content": json.dumps(request.params)})
 
@@ -141,15 +167,21 @@ async def test_openai_json_response_labeled_few_shot(
 
         return json.loads(response.choices[0].message.content)
 
-    result = maximize_score(
-        function=optimize_openai_json_response,
-        optimizer=LabeledFewShot(golden_demos, samples=SAMPLE_SIZE),
+    scores = []
+    optim.events.on("experiment", lambda r: scores.append(r.evals["score"]))
+
+    fn = await optim.atrain(
+        optimize_openai_json_response,
         evaluator=ZenLangSmith.metric_evaluator(
-            test_examples,
+            data=testset,
             evaluators=[score_answer],
             client=langsmith,
+            max_concurrency=2,
         ),
+        batch_size=BATCH_SIZE,
+        epochs=1,
     )
 
-    assert result.function is not None
-    assert len(result.experiments) == SAMPLE_SIZE
+    assert fn is not None
+    assert any(scores)
+    assert next(s for s in scores if s >= 0.5)

@@ -3,8 +3,8 @@ from parea.experiment.experiment import Experiment, ExperimentStatsSchema
 
 from zenbase.optim.metric.types import (
     MetricEvals,
-    MetricExperimentResult,
-    ExperimentRunner,
+    CandidateMetricResult,
+    CandidateMetricEvaluator,
 )
 from zenbase.types import LMFunction
 from zenbase.utils import random_name_gen
@@ -28,16 +28,16 @@ class ZenParea:
         *args,
         metric_evals: PareaMetricEvals = default_metric,
         **kwargs,
-    ) -> ExperimentRunner:
+    ) -> CandidateMetricEvaluator:
         gen_random_name = random_name_gen(kwargs.pop("experiment_name", None))
 
         def run_experiment(
             function: LMFunction[Params, Response]
-        ) -> MetricExperimentResult[Params, Response]:
+        ) -> CandidateMetricResult[Params, Response]:
             experiment = Experiment(func=function.call_sync, *args, **kwargs)
             experiment.run(gen_random_name())
 
-            return MetricExperimentResult(
+            return CandidateMetricResult(
                 function,
                 evals=metric_evals(experiment.experiment_stats),
             )

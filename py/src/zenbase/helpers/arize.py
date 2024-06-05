@@ -2,7 +2,7 @@ from typing import Callable, TYPE_CHECKING
 
 import pandas as pd
 
-from zenbase.optim.metric.types import MetricEvals, MetricExperimentResult
+from zenbase.optim.metric.types import MetricEvals, CandidateMetricResult
 from zenbase.types import LMDemo, LMFunction
 from zenbase.utils import amap
 
@@ -49,13 +49,13 @@ class ZenPhoenix:
 
         async def run_experiment(
             function: LMFunction[Params, Response],
-        ) -> MetricExperimentResult[Params, Response]:
+        ) -> CandidateMetricResult[Params, Response]:
             nonlocal dataset
             run_df = dataset.copy()
             # TODO: Is it typical for there to only be 1 value?
             responses = await amap(
                 function,
-                run_df["attributes.input.value"].to_list(),
+                run_df["attributes.input.value"].to_list(),  # i don't think this works
                 concurrency=concurrency,
             )
             run_df["attributes.output.value"] = responses
@@ -64,7 +64,7 @@ class ZenPhoenix:
                 run_df, evaluators, *args, concurrency=concurrency, **kwargs
             )
 
-            return MetricExperimentResult(
+            return CandidateMetricResult(
                 function,
                 evals=metric_evals(evaluators, eval_dfs),
             )

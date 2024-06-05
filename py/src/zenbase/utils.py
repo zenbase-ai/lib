@@ -8,13 +8,12 @@ import logging
 import os
 
 from faker import Faker
-from opentelemetry import trace, baggage
+from opentelemetry import trace
 from pksuid import PKSUID
 from structlog import get_logger
 
 
-logger: logging.Logger = get_logger()
-baggage = baggage
+get_logger: Callable[..., logging.Logger] = get_logger
 tracer = trace.get_tracer("zenbase")
 
 
@@ -31,8 +30,12 @@ def random_name_gen(
     random_name_generator=Faker().catch_phrase,
 ) -> Callable[[], str]:
     head = f"zenbase-{prefix}" if prefix else "zenbase"
-    tail = random_name_generator().lower().replace(" ", "-")
-    return f"{head}-{tail}"
+
+    def gen():
+        tail = random_name_generator().lower().replace(" ", "-")
+        return f"{head}-{tail}"
+
+    return gen
 
 
 I_ParamSpec = ParamSpec("I_ParamSpec")
@@ -69,15 +72,12 @@ def syncify(
 
     @functools.wraps(func)
     def wrapper(*args: I_ParamSpec.args, **kwargs: I_ParamSpec.kwargs) -> O_Retval:
-        current_async_module = (
-            getattr(threadlocals, "current_async_backend", None)
-            or
-            # TODO: remove when deprecating AnyIO 3.x
-            getattr(threadlocals, "current_async_module", None)
-        )
         partial_f = functools.partial(func, *args, **kwargs)
-        if current_async_module is None:
-            return anyio.run(partial_f)
+        if not getattr(threadlocals, "current_async_backend", None):
+            try:
+                return asyncio.get_running_loop().run_until_complete(partial_f())
+            except RuntimeError:
+                return anyio.run(partial_f)
         return anyio.from_thread.run(partial_f)
 
     return wrapper
@@ -107,7 +107,7 @@ async def amap[
 
 
 def pmap[O](func: Callable[..., O], iterable, *iterables, concurrency=20) -> list[O]:
-    return syncify(amap)(asyncify(func), iterable, *iterables, concurrency)
+    return syncify(amap)(asyncify(func), iterable, *iterables, concurrency=concurrency)
 
 
 async def alist[O](aiterable: AsyncIterable[O]) -> list[O]:

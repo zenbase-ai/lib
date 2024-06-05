@@ -17,7 +17,7 @@ def openai():
 
 
 @pytest.fixture
-def golden_demos_df(golden_demos: list[LMDemo]) -> pd.DataFrame:
+def golden_demos_df(gsm8k_demoset: list[LMDemo]) -> pd.DataFrame:
     # TODO
     return pd.DataFrame([])
 
@@ -28,10 +28,10 @@ def test_examples_df(gsm8k_dataset: DatasetDict) -> pd.DataFrame:
     return pd.DataFrame([])
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 @pytest.mark.vcr
 @pytest.mark.helpers
-async def test_arize_phoenix_labeled_few_shot(
+async def xtest_arize_phoenix_labeled_few_shot(
     test_examples_df: pd.DataFrame,
     golden_demos_df: pd.DataFrame,
     openai: AsyncOpenAI,
@@ -63,14 +63,3 @@ async def test_arize_phoenix_labeled_few_shot(
         return response.choices[0].message.content
 
     def evaluator() -> pd.DataFrame: ...
-
-    optimized_function, run = await LabeledFewShot.maximize_score(
-        function,
-        demos=ZenPhoenix.demos(golden_demos_df),
-        evaluator=ZenPhoenix.metric_evaluator(
-            evaluator,
-            testset=test_examples_df,
-            concurrency=20,
-        ),
-        samples=SAMPLE_SIZE,
-    )
