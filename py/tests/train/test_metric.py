@@ -1,18 +1,9 @@
 from dataclasses import dataclass
 import pytest
 
-from zenbase import (
-    deflm,
-    LMFunction,
-    LMRequest,
-    amaximize_score,
-    aminimize_loss,
-    maximize_score,
-    minimize_loss,
-)
 from zenbase.optim.abc import LMOptim
-from zenbase.train.metric import MetricExperimentResult
-from zenbase.types import LMZenbase
+from zenbase.optim.metric.types import MetricExperimentResult
+from zenbase.types import deflm, LMFunction, LMRequest, LMZenbase
 
 
 @deflm

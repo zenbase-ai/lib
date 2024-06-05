@@ -10,9 +10,9 @@ import requests
 
 
 from zenbase.helpers.langchain import ZenLangSmith
-from zenbase.optim.labeled_few_shot import LabeledFewShot
+from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
 from zenbase.types import LMRequest, deflm
-from zenbase.train.metric import maximize_score
+from zenbase.optim.metric.types import maximize_score
 
 TESTSET_SIZE = 5
 SAMPLE_SIZE = 2

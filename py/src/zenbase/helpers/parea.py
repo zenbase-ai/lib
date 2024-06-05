@@ -1,7 +1,11 @@
 from typing import Callable
 from parea.experiment.experiment import Experiment, ExperimentStatsSchema
 
-from zenbase.train.metric import MetricEvals, MetricExperimentResult, ExperimentRunner
+from zenbase.optim.metric.types import (
+    MetricEvals,
+    MetricExperimentResult,
+    ExperimentRunner,
+)
 from zenbase.types import LMFunction
 from zenbase.utils import random_name_gen
 

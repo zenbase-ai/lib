@@ -2,7 +2,7 @@ from typing import Callable, TYPE_CHECKING
 
 import pandas as pd
 
-from zenbase.train.metric import MetricEvals, MetricExperimentResult
+from zenbase.optim.metric.types import MetricEvals, MetricExperimentResult
 from zenbase.types import LMDemo, LMFunction
 from zenbase.utils import amap
 

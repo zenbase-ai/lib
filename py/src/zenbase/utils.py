@@ -4,10 +4,18 @@ import anyio
 import asyncio
 import functools
 import inspect
+import logging
 import os
 
-from pksuid import PKSUID
 from faker import Faker
+from opentelemetry import trace, baggage
+from pksuid import PKSUID
+from structlog import get_logger
+
+
+logger: logging.Logger = get_logger()
+baggage = baggage
+tracer = trace.get_tracer("zenbase")
 
 
 def get_seed(seed: int | None = None) -> int:

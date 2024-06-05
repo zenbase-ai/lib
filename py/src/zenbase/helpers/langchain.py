@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Iterator
 
 from zenbase.types import LMDemo, LMFunction
-from zenbase.train.metric import (
+from zenbase.optim.metric.types import (
     MetricEvals,
     MetricExperimentResult,
     MetricExperimentEvaluator,

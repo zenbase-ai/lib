@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from zenbase.helpers.arize import ZenPhoenix
-from zenbase.optim.labeled_few_shot import LabeledFewShot
+from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
 from zenbase.types import LMDemo, LMRequest
 
 TEST_SIZE = 5

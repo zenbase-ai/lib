@@ -1,13 +1,23 @@
-from abc import ABC
-from typing import AsyncGenerator
+from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from random import Random
 
-from zenbase.types import LMZenbase, LMFunction
+from pyee.asyncio import AsyncIOEventEmitter
+
+from zenbase.types import LMFunction
+from zenbase.utils import alist, get_seed, syncify
 
 
+@dataclass(kw_only=True)
 class LMOptim[Params: dict, Response: dict](ABC):
-    def reset(self): ...
+    random: Random = field(default_factory=lambda: Random(get_seed()))
+    events: AsyncIOEventEmitter = field(default_factory=AsyncIOEventEmitter)
 
-    async def acandidates(
-        self, function: LMFunction[Params, Response]
-    ) -> AsyncGenerator[LMZenbase, None]:
-        raise NotImplementedError()
+    @abstractmethod
+    def compile(self, function: LMFunction[Params, Response], *args, **kwargs):
+        return syncify(alist)(self.acompile(function, *args, **kwargs))
+
+    @abstractmethod
+    async def acompile(
+        self, function: LMFunction[Params, Response], *args, **kwargs
+    ) -> LMFunction[Params, Response]: ...

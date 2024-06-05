@@ -10,6 +10,11 @@ dependencies = [
     "pydantic>=2.7.3",
     "faker>=25.4.0",
     "anyio>=4.4.0",
+    "opentelemetry-sdk>=1.25.0",
+    "opentelemetry-api>=1.25.0",
+    "structlog>=24.2.0",
+    "rich>=13.7.1",
+    "pyee>=11.1.0",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -17,6 +22,9 @@ requires-python = ">= 3.10"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.mypy]
+namespace_packages = true
 
 [tool.pytest.ini_options]
 markers = ["helpers"]

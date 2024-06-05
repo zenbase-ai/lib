@@ -64,7 +64,7 @@ class LMFunction[Params: dict, Response: dict]:
         self,
         fn: LMCallable[Params, Response] | LMCallable[Params, Awaitable[Response]],
         zenbase: LMZenbase | None = None,
-        maxhistory: int = 128,
+        maxhistory: int = 1,
     ):
         self.id = self.gen_id()
         self.sync_fn = syncify(fn)
@@ -116,20 +116,28 @@ class LMFunction[Params: dict, Response: dict]:
         return self.process_response(request, response)
 
 
+type SyncDef[Params: dict, Response: dict] = Callable[
+    [LMRequest[Params, Response]],
+    Response,
+]
+type AsyncDef[Params: dict, Response: dict] = Callable[
+    [LMRequest[Params, Response]],
+    Awaitable[Response],
+]
+
+
 def deflm[
     Params: dict,
     Response: dict,
 ](
-    function: (
-        LMCallable[Params, Response] | LMCallable[Params, Awaitable[Response]] | None
-    ) = None,
-    request_defaults: LMRequest[Params, Response] | None = None,
-    maxhistory: int = 128,
+    function: SyncDef[Params, Response] | AsyncDef[Params, Response] | None = None,
+    zenbase: LMRequest[Params, Response] | None = None,
+    maxhistory: int = 0,
 ) -> LMFunction[Params, Response]:
     if function is None:
-        return partial(deflm, request_defaults=request_defaults, maxhistory=maxhistory)
+        return partial(deflm, zenbase=zenbase, maxhistory=maxhistory)
 
     if isinstance(function, LMFunction):
         return function.refine()
 
-    return LMFunction(function, request_defaults, maxhistory)
+    return LMFunction(function, zenbase, maxhistory)

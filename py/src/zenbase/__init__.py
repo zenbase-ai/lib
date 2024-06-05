@@ -1,4 +1,4 @@
-from zenbase.train.metric import (
+from zenbase.optim.metric.types import (
     maximize_score,
     amaximize_score,
     minimize_loss,

@@ -1,6 +1,10 @@
 import lunary
 
-from zenbase.train.metric import MetricEvals, MetricExperimentResult, ExperimentRunner
+from zenbase.optim.metric.types import (
+    MetricEvals,
+    MetricExperimentResult,
+    ExperimentRunner,
+)
 from zenbase.types import LMDemo, LMFunction
 from zenbase.utils import pmap
 
