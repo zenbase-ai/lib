@@ -10,12 +10,12 @@ lmfn = deflm(lambda x: x)
 
 
 demoset = [
-    LMDemo(params={}, response={"output": "a"}),
-    LMDemo(params={}, response={"output": "b"}),
-    LMDemo(params={}, response={"output": "c"}),
-    LMDemo(params={}, response={"output": "d"}),
-    LMDemo(params={}, response={"output": "e"}),
-    LMDemo(params={}, response={"output": "f"}),
+    LMDemo(inputs={}, outputs={"output": "a"}),
+    LMDemo(inputs={}, outputs={"output": "b"}),
+    LMDemo(inputs={}, outputs={"output": "c"}),
+    LMDemo(inputs={}, outputs={"output": "d"}),
+    LMDemo(inputs={}, outputs={"output": "e"}),
+    LMDemo(inputs={}, outputs={"output": "f"}),
 ]
 
 

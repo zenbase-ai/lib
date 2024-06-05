@@ -16,11 +16,11 @@ if TYPE_CHECKING:
 class ZenLangSmith:
     @staticmethod
     def examples_to_demos(examples: Iterator["schemas.Example"]) -> list[LMDemo]:
-        return [LMDemo(params=e.inputs, response=e.outputs) for e in examples]
+        return [LMDemo(inputs=e.inputs, outputs=e.outputs) for e in examples]
 
     @classmethod
     def metric_evaluator[
-        Params: dict, Response: dict
+        Inputs: dict, Outputs: dict
     ](cls, **evaluate_kwargs) -> CandidateMetricEvaluator:
         from langsmith import evaluate
 
@@ -30,8 +30,8 @@ class ZenLangSmith:
         )
 
         def evaluate_candidate(
-            function: LMFunction[Params, Response],
-        ) -> CandidateMetricResult[Params, Response]:
+            function: LMFunction[Inputs, Outputs],
+        ) -> CandidateMetricResult[Inputs, Outputs]:
             experiment_results = evaluate(
                 function.call_sync,
                 experiment_prefix=gen_random_name(),

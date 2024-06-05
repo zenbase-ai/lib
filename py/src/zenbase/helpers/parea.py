@@ -1,5 +1,8 @@
+from dataclasses import asdict
+import json
 from typing import Callable
-from parea.experiment.experiment import Experiment, ExperimentStatsSchema
+from parea import Parea
+from parea.schemas import ExperimentStatsSchema
 
 from zenbase.optim.metric.types import (
     MetricEvals,
@@ -10,36 +13,49 @@ from zenbase.types import LMFunction
 from zenbase.utils import random_name_gen
 
 
-type PareaMetricEvals = Callable[[dict[str, float]], MetricEvals]
-
-
 class ZenParea:
+    type MetricEvaluator = Callable[[dict[str, float]], MetricEvals]
+
     @staticmethod
-    def default_metric(stats: ExperimentStatsSchema) -> float:
-        evals = {"score": sum(stats.avg_scores.values())}
-        evals.update(stats.avg_scores)
-        return evals
+    def default_metric(stats: ExperimentStatsSchema) -> MetricEvals:
+        return {**stats.avg_scores, "score": sum(stats.avg_scores.values())}
 
     @classmethod
     def metric_evaluator[
-        Params: dict, Response: dict
+        Inputs: dict, Outputs: dict
     ](
         cls,
         *args,
-        metric_evals: PareaMetricEvals = default_metric,
+        p: Parea | None = None,
+        eval_metrics: MetricEvaluator = default_metric,
         **kwargs,
     ) -> CandidateMetricEvaluator:
-        gen_random_name = random_name_gen(kwargs.pop("experiment_name", None))
+        p = p or Parea()
+        assert isinstance(p, Parea)
 
-        def run_experiment(
-            function: LMFunction[Params, Response]
-        ) -> CandidateMetricResult[Params, Response]:
-            experiment = Experiment(func=function.call_sync, *args, **kwargs)
-            experiment.run(gen_random_name())
+        base_metadata = kwargs.pop("metadata", {})
+        gen_random_name = random_name_gen(kwargs.pop("name", None))
+
+        def evaluate_candidate(
+            function: LMFunction[Inputs, Outputs]
+        ) -> CandidateMetricResult[Inputs, Outputs]:
+            experiment = p.experiment(
+                func=function.call_sync,
+                *args,
+                **kwargs,
+                name=gen_random_name(),
+                metadata={
+                    **base_metadata,
+                    "zenbase": json.dumps(asdict(function.zenbase)),
+                },
+            )
+
+            experiment.run()
+            assert experiment.experiment_stats, "failed to run experiment"
 
             return CandidateMetricResult(
                 function,
-                evals=metric_evals(experiment.experiment_stats),
+                evals=eval_metrics(experiment.experiment_stats),
             )
 
-        return run_experiment
+        return evaluate_candidate

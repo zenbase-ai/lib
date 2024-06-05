@@ -9,12 +9,12 @@ class MetricEvals(TypedDict):
 
 
 @dataclass
-class CandidateMetricResult[Params: dict, Response: dict]:
-    function: LMFunction[Params, Response]
+class CandidateMetricResult[Inputs: dict, Outputs: dict]:
+    function: LMFunction[Inputs, Outputs]
     evals: MetricEvals = field(default_factory=dict)
 
 
-type CandidateMetricEvaluator[Params: dict, Response: dict] = Callable[
-    [LMFunction[Params, Response]],
-    CandidateMetricResult[Params, Response],
+type CandidateMetricEvaluator[Inputs: dict, Outputs: dict] = Callable[
+    [LMFunction[Inputs, Outputs]],
+    CandidateMetricResult[Inputs, Outputs],
 ]

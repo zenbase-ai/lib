@@ -19,15 +19,16 @@ from zenbase.helpers.langchain import ZenLangSmith
 from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
 from zenbase.types import LMRequest, deflm
 
-TESTSET_SIZE = 5
 BATCH_SIZE = 2
+SHOTS = 3
+TESTSET_SIZE = 5
 
 log = logging.getLogger(__name__)
 
 
 @pytest.fixture
 def optim(gsm8k_demoset: list):
-    return LabeledFewShot(demoset=gsm8k_demoset, shots=3)
+    return LabeledFewShot(demoset=gsm8k_demoset, shots=SHOTS)
 
 
 @pytest.fixture(scope="module")
@@ -48,7 +49,7 @@ def testset(gsm8k_dataset: DatasetDict, langsmith: Client):
         if e.response.status_code != 404:
             raise
         dataset = langsmith.create_dataset("gsm8k-test-examples")
-        examples = gsm8k_dataset["test"].select(TESTSET_SIZE)
+        examples = gsm8k_dataset["test"].select(range(TESTSET_SIZE))
         langsmith.create_examples(
             inputs=[{"question": e["question"]} for e in examples],
             outputs=[{"answer": e["answer"]} for e in examples],
@@ -58,12 +59,11 @@ def testset(gsm8k_dataset: DatasetDict, langsmith: Client):
 
 
 def score_answer(run: Run, example: Example) -> bool:
+    output = run.outputs["answer"].split("#### ")[-1]
+    target = example.outputs["answer"].split("#### ")[-1]
     return {
         "key": "correctness",
-        "score": int(
-            run.outputs["answer"].split("#### ")[-1]
-            == example.outputs["answer"].split("#### ")[-1]
-        ),
+        "score": int(output == target),
     }
 
 
@@ -80,7 +80,7 @@ def test_langsmith_lcel_labeled_few_shot(
         before_sleep=before_sleep_log(log, logging.WARN),
     )
     @traceable
-    def optimize_lcel(request: LMRequest):
+    def langchain_chain(request: LMRequest):
         from langchain_openai import ChatOpenAI
         from langchain_core.prompts import ChatPromptTemplate
         from langchain_core.output_parsers import StrOutputParser
@@ -93,8 +93,8 @@ def test_langsmith_lcel_labeled_few_shot(
         ]
         for demo in request.zenbase.demos:
             messages += [
-                ("user", demo.params["question"]),
-                ("assistant", demo.response["answer"]),
+                ("user", demo.inputs["question"]),
+                ("assistant", demo.outputs["answer"]),
             ]
 
         messages.append(("user", "{question}"))
@@ -106,14 +106,14 @@ def test_langsmith_lcel_labeled_few_shot(
         )
 
         print("Mathing...")
-        answer = chain.invoke(request.params)
+        answer = chain.invoke(request.inputs)
         return {"answer": answer}
 
     scores = []
     optim.events.on("experiment", lambda r: scores.append(r.evals["score"]))
 
     fn = optim.train(
-        optimize_lcel,
+        langchain_chain,
         evaluator=ZenLangSmith.metric_evaluator(
             data=testset,
             evaluators=[score_answer],
@@ -144,7 +144,7 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
         before_sleep=before_sleep_log(log, logging.WARN),
     )
     @traceable
-    async def optimize_openai_json_response(request: LMRequest) -> dict:
+    async def openai_json_response(request: LMRequest) -> dict:
         messages = [
             {
                 "role": "system",
@@ -153,10 +153,10 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
         ]
         for demo in request.zenbase.demos:
             messages += [
-                {"role": "user", "content": json.dumps(demo.params)},
-                {"role": "assistant", "content": json.dumps(demo.response)},
+                {"role": "user", "content": json.dumps(demo.inputs)},
+                {"role": "assistant", "content": json.dumps(demo.outputs)},
             ]
-        messages.append({"role": "user", "content": json.dumps(request.params)})
+        messages.append({"role": "user", "content": json.dumps(request.inputs)})
 
         print("Mathing...")
         response = await openai.chat.completions.create(
@@ -171,7 +171,7 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
     optim.events.on("experiment", lambda r: scores.append(r.evals["score"]))
 
     fn = await optim.atrain(
-        optimize_openai_json_response,
+        openai_json_response,
         evaluator=ZenLangSmith.metric_evaluator(
             data=testset,
             evaluators=[score_answer],

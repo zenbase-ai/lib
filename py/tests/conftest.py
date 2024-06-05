@@ -118,8 +118,8 @@ def gsm8k_dataset():
 def gsm8k_demoset(gsm8k_dataset: DatasetDict) -> list[LMDemo]:
     return [
         LMDemo(
-            params={"question": r["question"]},
-            response={"answer": r["answer"]},
+            inputs={"question": r["question"]},
+            outputs={"answer": r["answer"]},
         )
         for r in gsm8k_dataset["train"].select(range(5))
     ]

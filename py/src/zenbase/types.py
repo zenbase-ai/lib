@@ -10,62 +10,62 @@ from zenbase.utils import asyncify, id_gen, syncify
 
 
 @dataclass(frozen=True)
-class LMDemo[Params: dict, Response: dict]:
-    params: Params
-    response: Response
+class LMDemo[Inputs: dict, Outputs: dict]:
+    inputs: Inputs
+    outputs: Outputs
 
     def __hash__(self):
-        return hash((frozenset(self.params.items()), frozenset(self.response.items())))
+        return hash((frozenset(self.inputs.items()), frozenset(self.outputs.items())))
 
 
 @dataclass(frozen=True)
-class LMZenbase[Params: dict, Response: dict]:
+class LMZenbase[Inputs: dict, Outputs: dict]:
     instructions: list[str] = field(default_factory=list)
     dos: list[str] = field(default_factory=list)
     donts: list[str] = field(default_factory=list)
-    demos: list[LMDemo[Params, Response]] = field(default_factory=list)
+    demos: list[LMDemo[Inputs, Outputs]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
-class LMRequest[Params: dict, Response: dict]:
-    zenbase: LMZenbase[Params, Response]
-    params: Params = field(default_factory=dict)
+class LMRequest[Inputs: dict, Outputs: dict]:
+    zenbase: LMZenbase[Inputs, Outputs]
+    inputs: Inputs = field(default_factory=dict)
     id: str = field(default_factory=id_gen("request"))
 
 
 @dataclass(frozen=True)
-class LMCall[Params: dict, Response: dict]:
-    function: "LMFunction[Params, Response]"
-    request: LMRequest[Params, Response]
-    response: Response
+class LMCall[Inputs: dict, Outputs: dict]:
+    function: "LMFunction[Inputs, Outputs]"
+    request: LMRequest[Inputs, Outputs]
+    response: Outputs
     id: str = field(default_factory=id_gen("call"))
 
 
-type SyncDef[Params: dict, Response: dict] = Callable[
-    [LMRequest[Params, Response]],
-    Response,
+type SyncDef[Inputs: dict, Outputs: dict] = Callable[
+    [LMRequest[Inputs, Outputs]],
+    Outputs,
 ]
-type AsyncDef[Params: dict, Response: dict] = Callable[
-    [LMRequest[Params, Response]],
-    Awaitable[Response],
+type AsyncDef[Inputs: dict, Outputs: dict] = Callable[
+    [LMRequest[Inputs, Outputs]],
+    Awaitable[Outputs],
 ]
 
 
-class LMFunction[Params: dict, Response: dict]:
+class LMFunction[Inputs: dict, Outputs: dict]:
     gen_id = staticmethod(id_gen("fn"))
 
     id: str
-    fn: SyncDef[Params, Response] | AsyncDef[Params, Response]
+    fn: SyncDef[Inputs, Outputs] | AsyncDef[Inputs, Outputs]
     __name__: str
     __qualname__: str
     __doc__: str
     __signature__: inspect.Signature
     zenbase: LMZenbase
-    history: deque[LMCall[Params, Response]]
+    history: deque[LMCall[Inputs, Outputs]]
 
     def __init__(
         self,
-        fn: SyncDef[Params, Response] | AsyncDef[Params, Response],
+        fn: SyncDef[Inputs, Outputs] | AsyncDef[Inputs, Outputs],
         zenbase: LMZenbase | None = None,
         maxhistory: int = 1,
     ):
@@ -80,21 +80,19 @@ class LMFunction[Params: dict, Response: dict]:
         self.zenbase = zenbase or LMZenbase()
         self.history = deque([], maxlen=maxhistory)
 
-    def refine(
-        self, zenbase: LMZenbase | None = None
-    ) -> "LMFunction[Params, Response]":
+    def refine(self, zenbase: LMZenbase | None = None) -> "LMFunction[Inputs, Outputs]":
         dup = copy(self)
         dup.id = self.gen_id()
         dup.zenbase = zenbase or replace(self.zenbase)
         dup.history = deque([], maxlen=self.history.maxlen)
         return dup
 
-    def prepare_request(self, params: Params) -> LMRequest[Params, Response]:
-        return LMRequest(zenbase=self.zenbase, params=params)
+    def prepare_request(self, inputs: Inputs) -> LMRequest[Inputs, Outputs]:
+        return LMRequest(zenbase=self.zenbase, inputs=inputs)
 
     def process_response(
-        self, request: LMRequest[Params, Response], response: Response
-    ) -> Response:
+        self, request: LMRequest[Inputs, Outputs], response: Outputs
+    ) -> Outputs:
         self.history.append(
             LMCall(
                 function=self,
@@ -106,25 +104,27 @@ class LMFunction[Params: dict, Response: dict]:
 
     async def __call__(
         self,
-        params: Params = {},
-    ) -> Response:
-        request = self.prepare_request(params)
-        response = await asyncify(self.fn)(request)
+        inputs: Inputs = {},
+        *args,
+        **kwargs,
+    ) -> Outputs:
+        request = self.prepare_request(inputs)
+        response = await asyncify(self.fn)(request, *args, **kwargs)
         return self.process_response(request, response)
 
-    def call_sync(self, params: Params = {}) -> Response:
-        request = self.prepare_request(params)
-        response = syncify(self.fn)(request)
+    def call_sync(self, inputs: Inputs = {}, *args, **kwargs) -> Outputs:
+        request = self.prepare_request(inputs)
+        response = syncify(self.fn)(request, *args, **kwargs)
         return self.process_response(request, response)
 
 
 def deflm[
-    Params: dict,
-    Response: dict,
+    Inputs: dict,
+    Outputs: dict,
 ](
-    function: SyncDef[Params, Response] | AsyncDef[Params, Response] | None = None,
-    zenbase: LMRequest[Params, Response] | None = None,
-) -> LMFunction[Params, Response]:
+    function: SyncDef[Inputs, Outputs] | AsyncDef[Inputs, Outputs] | None = None,
+    zenbase: LMRequest[Inputs, Outputs] | None = None,
+) -> LMFunction[Inputs, Outputs]:
     if function is None:
         return partial(deflm, zenbase=zenbase)
 

@@ -18,8 +18,8 @@ class ZenPhoenix:
 
     @staticmethod
     def df_to_demos[
-        Params: dict, Response: dict
-    ](df: pd.DataFrame) -> list[LMDemo[Params, Response]]:
+        Inputs: dict, Outputs: dict
+    ](df: pd.DataFrame) -> list[LMDemo[Inputs, Outputs]]:
         raise NotImplementedError()
 
     @staticmethod
@@ -34,8 +34,8 @@ class ZenPhoenix:
 
     @classmethod
     def metric_evaluator[
-        Params: dict,
-        Response: dict,
+        Inputs: dict,
+        Outputs: dict,
     ](
         cls,
         dataset: pd.DataFrame,
@@ -48,8 +48,8 @@ class ZenPhoenix:
         from phoenix.evals import run_evals
 
         async def run_experiment(
-            function: LMFunction[Params, Response],
-        ) -> CandidateMetricResult[Params, Response]:
+            function: LMFunction[Inputs, Outputs],
+        ) -> CandidateMetricResult[Inputs, Outputs]:
             nonlocal dataset
             run_df = dataset.copy()
             # TODO: Is it typical for there to only be 1 value?

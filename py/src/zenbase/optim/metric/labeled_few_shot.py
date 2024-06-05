@@ -11,8 +11,8 @@ log = get_logger(__name__)
 
 
 @dataclass(kw_only=True)
-class LabeledFewShot[Params: dict, Response: dict](LMOptim):
-    demoset: list[LMDemo[Params, Response]]
+class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
+    demoset: list[LMDemo[Inputs, Outputs]]
     shots: int = field(default=5)
 
     def __post_init__(self):
@@ -21,12 +21,12 @@ class LabeledFewShot[Params: dict, Response: dict](LMOptim):
     @tracer.start_as_current_span("train")
     async def atrain(
         self,
-        function: LMFunction[Params, Response],
-        evaluator: CandidateMetricEvaluator[Params, Response],
+        function: LMFunction[Inputs, Outputs],
+        evaluator: CandidateMetricEvaluator[Inputs, Outputs],
         batch_size: int = 0,
         epochs: int = 1,
         concurrency: int = 1,
-    ) -> LMFunction[Params, Response]:
+    ) -> LMFunction[Inputs, Outputs]:
         batch_size = batch_size or len(self.demoset)
         evaluate = asyncify(evaluator)
 
@@ -59,15 +59,15 @@ class LabeledFewShot[Params: dict, Response: dict](LMOptim):
 
     def train(
         self,
-        lmfn: LMFunction[Params, Response],
-        evaluator: CandidateMetricEvaluator[Params, Response],
+        lmfn: LMFunction[Inputs, Outputs],
+        evaluator: CandidateMetricEvaluator[Inputs, Outputs],
         batch_size: int = 0,
         epochs: int = 1,
         concurrency: int = 1,
-    ) -> LMFunction[Params, Response]:
+    ) -> LMFunction[Inputs, Outputs]:
         return syncify(self.atrain)(lmfn, evaluator, batch_size, epochs, concurrency)
 
-    def candidates(self, _: LMFunction[Params, Response], batch_size: int):
+    def candidates(self, _: LMFunction[Inputs, Outputs], batch_size: int):
         if batch_size > len(self.demoset):
             log.warn(
                 "Batch size is greater than the demos, using demoset size",
