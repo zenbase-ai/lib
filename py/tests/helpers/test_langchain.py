@@ -42,7 +42,7 @@ def langsmith():
 
 
 @pytest.fixture(scope="module")
-def testset(gsm8k_dataset: DatasetDict, langsmith: Client):
+def evalset(gsm8k_dataset: DatasetDict, langsmith: Client):
     try:
         return list(langsmith.list_examples(dataset_name="gsm8k-test-examples"))
     except requests.exceptions.HTTPError as e:
@@ -58,7 +58,7 @@ def testset(gsm8k_dataset: DatasetDict, langsmith: Client):
         return list(langsmith.list_examples(dataset_name="gsm8k-test-examples"))
 
 
-def score_answer(run: Run, example: Example) -> bool:
+def score_answer(run: Run, example: Example):
     output = run.outputs["answer"].split("#### ")[-1]
     target = example.outputs["answer"].split("#### ")[-1]
     return {
@@ -71,7 +71,7 @@ def score_answer(run: Run, example: Example) -> bool:
 def test_langsmith_lcel_labeled_few_shot(
     langsmith: Client,
     optim: LabeledFewShot,
-    testset: list,
+    evalset: list,
 ):
     @deflm
     @retry(
@@ -112,7 +112,7 @@ def test_langsmith_lcel_labeled_few_shot(
     fn, candidates = optim.train(
         langchain_chain,
         evaluator=ZenLangSmith.metric_evaluator(
-            data=testset,
+            data=evalset,
             evaluators=[score_answer],
             client=langsmith,
             max_concurrency=2,
@@ -123,7 +123,7 @@ def test_langsmith_lcel_labeled_few_shot(
 
     assert fn is not None
     assert any(candidates)
-    assert next(c for c in candidates if c.evals["score"] >= 0.5)
+    assert next(c for c in candidates if 0.5 <= c.evals["score"] <= 1)
 
 
 @pytest.mark.anyio
@@ -132,7 +132,7 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
     langsmith: Client,
     openai: AsyncOpenAI,
     optim: LabeledFewShot,
-    testset: list,
+    evalset: list,
 ):
     @deflm
     @retry(
@@ -167,7 +167,7 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
     fn, candidates = await optim.atrain(
         openai_json_response,
         evaluator=ZenLangSmith.metric_evaluator(
-            data=testset,
+            data=evalset,
             evaluators=[score_answer],
             client=langsmith,
             max_concurrency=2,
@@ -178,4 +178,4 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
 
     assert fn is not None
     assert any(candidates)
-    assert next(c for c in candidates if c.evals["score"] >= 0.5)
+    assert next(c for c in candidates if 0.5 <= c.evals["score"] <= 1)

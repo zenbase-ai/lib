@@ -1,9 +1,8 @@
-import json
 import logging
 
 from openai import OpenAI
-from parea import Parea, trace
-from parea.schemas import Log, EvaluationResult
+from langfuse import Langfuse
+from langfuse.decorators import observe
 from datasets import DatasetDict
 from tenacity import (
     before_sleep_log,
@@ -13,9 +12,11 @@ from tenacity import (
 )
 import pytest
 
-from zenbase.helpers.parea import ZenParea
+from zenbase.helpers.langfuse import ZenLangfuse
 from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
-from zenbase.types import LMRequest, deflm
+from zenbase.optim.metric.types import MetricEvals
+from zenbase.types import LMDemo, LMRequest, deflm
+from zenbase.utils import pmap
 
 SAMPLES = 2
 SHOTS = 3
@@ -30,37 +31,32 @@ def optim(gsm8k_demoset: list):
 
 
 @pytest.fixture(scope="module")
-def parea():
-    return Parea()
-
-
-@pytest.fixture(scope="module")
-def openai(parea: Parea):
-    client = OpenAI()
-    parea.wrap_openai_client(client)
+def langfuse():
+    client = Langfuse()
+    client.auth_check()
     return client
 
 
 @pytest.fixture(scope="module")
-def evalset(gsm8k_dataset: DatasetDict, parea: Parea):
+def openai():
+    return OpenAI()
+
+
+@pytest.fixture(scope="module")
+def evalset(gsm8k_dataset: DatasetDict, langfuse: Langfuse):
     try:
-        return [
-            {"inputs": json.loads(case.inputs["inputs"]), "target": case.target}
-            for case in parea.get_collection("gsm8k-testset").test_cases.values()
-        ]
-    except TypeError:
-        data = [
-            {"inputs": {"question": example["question"]}, "target": example["answer"]}
-            for example in gsm8k_dataset["test"].select(range(EVALSET_SIZE))
-        ]
-        parea.create_test_collection(data, name="gsm8k-testset")
-        return data
-
-
-def score_answer(log: Log) -> EvaluationResult:
-    output = log.output.split("#### ")[-1]
-    target = log.target.split("#### ")[-1]
-    return EvaluationResult("correctness", int(output == target))
+        return langfuse.get_dataset("gsm8k-testset")
+    except:  # noqa: E722
+        langfuse.create_dataset("gsm8k-testset")
+        pmap(
+            lambda example: langfuse.create_dataset_item(
+                dataset_name="gsm8k-testset",
+                input={"question": example["question"]},
+                expected_output=example["answer"],
+            ),
+            gsm8k_dataset["test"].select(range(EVALSET_SIZE)),
+        )
+        return langfuse.get_dataset("gsm8k-testset")
 
 
 @deflm
@@ -69,8 +65,8 @@ def score_answer(log: Log) -> EvaluationResult:
     wait=wait_exponential_jitter(max=8),
     before_sleep=before_sleep_log(log, logging.WARN),
 )
-@trace(eval_funcs=[score_answer])
-def langchain_chain(request: LMRequest):
+@observe()
+def langchain_chain(request: LMRequest) -> str:
     from langchain_openai import ChatOpenAI
     from langchain_core.prompts import ChatPromptTemplate
     from langchain_core.output_parsers import StrOutputParser
@@ -100,15 +96,22 @@ def langchain_chain(request: LMRequest):
     return answer
 
 
+def score_answer(answer: str, demo: LMDemo, langfuse: Langfuse) -> MetricEvals:
+    """The first argument is the return value from the `langchain_chain` function above."""
+    score = int(answer.split("#### ")[-1] == demo.outputs.split("#### ")[-1])
+    langfuse.score(
+        name="correctness",
+        value=score,
+        trace_id=langfuse.get_trace_id(),
+    )
+    return {"score": score}
+
+
 @pytest.mark.helpers
-def test_parea_lcel_labeled_few_shot(
-    optim: LabeledFewShot,
-    parea: Parea,
-    evalset: list,
-):
+def test_langfuse_lcel_labeled_few_shot(optim: LabeledFewShot, evalset: list):
     fn, candidates = optim.train(
         langchain_chain,
-        evaluator=ZenParea.metric_evaluator(data=evalset, n_workers=2, p=parea),
+        evaluator=ZenLangfuse.metric_evaluator(evalset, evaluate=score_answer),
         samples=SAMPLES,
         rounds=1,
     )

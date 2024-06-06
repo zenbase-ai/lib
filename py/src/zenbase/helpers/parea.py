@@ -17,7 +17,7 @@ class ZenParea:
     type MetricEvaluator = Callable[[dict[str, float]], MetricEvals]
 
     @staticmethod
-    def default_metric(stats: ExperimentStatsSchema) -> MetricEvals:
+    def default_candidate_evals(stats: ExperimentStatsSchema) -> MetricEvals:
         return {**stats.avg_scores, "score": sum(stats.avg_scores.values())}
 
     @classmethod
@@ -27,7 +27,7 @@ class ZenParea:
         cls,
         *args,
         p: Parea | None = None,
-        eval_metrics: MetricEvaluator = default_metric,
+        candidate_evals: MetricEvaluator = default_candidate_evals,
         **kwargs,
     ) -> CandidateMetricEvaluator:
         p = p or Parea()
@@ -55,7 +55,7 @@ class ZenParea:
 
             return CandidateMetricResult(
                 function,
-                evals=eval_metrics(experiment.experiment_stats),
+                evals=candidate_evals(experiment.experiment_stats),
             )
 
         return evaluate_candidate

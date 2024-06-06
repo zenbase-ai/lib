@@ -1,4 +1,5 @@
 from typing import Any, Callable
+
 import lunary
 
 from zenbase.optim.metric.types import (
@@ -15,7 +16,8 @@ class ZenLunary:
 
     @staticmethod
     def default_metric(batch_results: list[tuple[bool, Any]]) -> MetricEvals:
-        return {"score": sum(int(passed) for passed, _ in batch_results)}
+        avg_pass = sum(int(passed) for passed, _ in batch_results) / len(batch_results)
+        return {"score": avg_pass}
 
     @staticmethod
     def dataset_to_demos(dataset: list[lunary.DatasetItem]) -> list[LMDemo]:
@@ -37,10 +39,10 @@ class ZenLunary:
             function: LMFunction[Inputs, Outputs]
         ) -> CandidateMetricResult[Inputs, Outputs]:
             def run_and_evaluate(item: lunary.DatasetItem):
-                response = function.call_sync({"input": item.input})
+                response = function.call_sync(item.input)
                 return lunary.evaluate(
                     checklist,
-                    input={"input": item.input},
+                    input=item.input,
                     output=response,
                     ideal_output=item.ideal_output,
                     *args,

@@ -37,7 +37,7 @@ class LMRequest[Inputs: dict, Outputs: dict]:
 class LMCall[Inputs: dict, Outputs: dict]:
     function: "LMFunction[Inputs, Outputs]"
     request: LMRequest[Inputs, Outputs]
-    response: Outputs
+    outputs: Outputs
     id: str = field(default_factory=id_gen("call"))
 
 
@@ -97,7 +97,7 @@ class LMFunction[Inputs: dict, Outputs: dict]:
             LMCall(
                 function=self,
                 request=request,
-                response=response,
+                outputs=response,
             ),
         )
         return response

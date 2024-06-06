@@ -35,7 +35,10 @@ def openai():
 
 
 @pytest.fixture(scope="module")
-def testset(): ...
+def evalset():
+    items = lunary.get_dataset("gsm8k-evalset")
+    assert any(items)
+    return items
 
 
 @deflm
@@ -75,19 +78,19 @@ def langchain_chain(request: LMRequest):
 
     print("Mathing...")
     answer = chain.invoke(request.inputs)
-    return answer
+    return answer.split("#### ")[-1]
 
 
 @pytest.mark.helpers
 def test_lunary_lcel_labeled_few_shot(
     optim: LabeledFewShot,
-    testset: list,
+    evalset: list,
 ):
     fn, candidates = optim.train(
         langchain_chain,
         evaluator=ZenLunary.metric_evaluator(
-            checklist="",
-            evalset=testset,
+            checklist="exact-match",
+            evalset=evalset,
             concurrency=2,
         ),
         samples=SAMPLES,
@@ -96,4 +99,4 @@ def test_lunary_lcel_labeled_few_shot(
 
     assert fn is not None
     assert any(candidates)
-    assert next(c for c in candidates if c.evals["score"] >= 0.5)
+    assert next(c for c in candidates if 0.5 <= c.evals["score"] <= 1)

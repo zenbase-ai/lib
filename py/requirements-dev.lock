@@ -281,7 +281,7 @@ langchain-core==0.2.3
 langchain-openai==0.1.8
 langchain-text-splitters==0.2.0
     # via langchain
-langfuse==2.33.1
+langfuse==2.35.0
 langsmith==0.1.72
     # via langchain
     # via langchain-core
