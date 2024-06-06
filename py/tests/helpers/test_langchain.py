@@ -19,7 +19,7 @@ from zenbase.helpers.langchain import ZenLangSmith
 from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
 from zenbase.types import LMRequest, deflm
 
-BATCH_SIZE = 2
+SAMPLES = 2
 SHOTS = 3
 TESTSET_SIZE = 5
 
@@ -109,10 +109,7 @@ def test_langsmith_lcel_labeled_few_shot(
         answer = chain.invoke(request.inputs)
         return {"answer": answer}
 
-    scores = []
-    optim.events.on("experiment", lambda r: scores.append(r.evals["score"]))
-
-    fn = optim.train(
+    fn, candidates = optim.train(
         langchain_chain,
         evaluator=ZenLangSmith.metric_evaluator(
             data=testset,
@@ -120,13 +117,13 @@ def test_langsmith_lcel_labeled_few_shot(
             client=langsmith,
             max_concurrency=2,
         ),
-        batch_size=BATCH_SIZE,
-        epochs=1,
+        samples=SAMPLES,
+        rounds=1,
     )
 
     assert fn is not None
-    assert any(scores)
-    assert next(s for s in scores if s >= 0.5)
+    assert any(candidates)
+    assert next(c for c in candidates if c.evals["score"] >= 0.5)
 
 
 @pytest.mark.anyio
@@ -167,10 +164,7 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
 
         return json.loads(response.choices[0].message.content)
 
-    scores = []
-    optim.events.on("experiment", lambda r: scores.append(r.evals["score"]))
-
-    fn = await optim.atrain(
+    fn, candidates = await optim.atrain(
         openai_json_response,
         evaluator=ZenLangSmith.metric_evaluator(
             data=testset,
@@ -178,10 +172,10 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
             client=langsmith,
             max_concurrency=2,
         ),
-        batch_size=BATCH_SIZE,
-        epochs=1,
+        samples=SAMPLES,
+        rounds=1,
     )
 
     assert fn is not None
-    assert any(scores)
-    assert next(s for s in scores if s >= 0.5)
+    assert any(candidates)
+    assert next(c for c in candidates if c.evals["score"] >= 0.5)

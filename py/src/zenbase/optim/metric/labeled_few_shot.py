@@ -1,10 +1,11 @@
 from dataclasses import dataclass, field
-from typing import cast
+from math import factorial
+from typing import NamedTuple
 
 from zenbase.optim.abc import LMOptim
 from zenbase.optim.metric.types import CandidateMetricEvaluator, CandidateMetricResult
 from zenbase.types import LMDemo, LMFunction, LMZenbase
-from zenbase.utils import amap, asyncify, syncify, tracer, get_logger
+from zenbase.utils import asyncify, pmap, tracer, get_logger
 
 
 log = get_logger(__name__)
@@ -12,6 +13,10 @@ log = get_logger(__name__)
 
 @dataclass(kw_only=True)
 class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
+    class TrainResult(NamedTuple):
+        best: LMFunction[Inputs, Outputs]
+        candidates: list[CandidateMetricResult]
+
     demoset: list[LMDemo[Inputs, Outputs]]
     shots: int = field(default=5)
 
@@ -19,63 +24,64 @@ class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
         assert 1 <= self.shots <= len(self.demoset)
 
     @tracer.start_as_current_span("train")
-    async def atrain(
+    def train(
         self,
         function: LMFunction[Inputs, Outputs],
         evaluator: CandidateMetricEvaluator[Inputs, Outputs],
-        batch_size: int = 0,
-        epochs: int = 1,
+        samples: int = 0,
+        rounds: int = 1,
         concurrency: int = 1,
-    ) -> LMFunction[Inputs, Outputs]:
-        batch_size = batch_size or len(self.demoset)
-        evaluate = asyncify(evaluator)
+    ) -> TrainResult:
+        samples = samples or len(self.demoset)
 
         score = float("-inf")
         best = function
 
         @tracer.start_as_current_span("run_experiment")
-        async def run_candidate_zenbase(zenbase: LMZenbase):
+        def run_candidate_zenbase(zenbase: LMZenbase):
             nonlocal score, best
 
             candidate_fn = function.refine(zenbase)
-            result = cast(CandidateMetricResult, await evaluate(candidate_fn))
+            candidate_result = evaluator(candidate_fn)
 
-            self.events.emit("experiment", result)
+            self.events.emit("candidate", candidate_result)
 
-            if result.evals["score"] > score:
-                score = result.evals["score"]
+            if candidate_result.evals["score"] > score:
+                score = candidate_result.evals["score"]
                 best = candidate_fn
 
-            return result
+            return candidate_result
 
-        for _ in range(epochs):
-            await amap(
+        candidates: list[CandidateMetricResult] = []
+        for _ in range(rounds):
+            candidates += pmap(
                 run_candidate_zenbase,
-                self.candidates(best, batch_size),
+                self.candidates(best, samples),
                 concurrency=concurrency,
             )
 
-        return best
+        return self.TrainResult(best, candidates)
 
-    def train(
+    async def atrain(
         self,
         lmfn: LMFunction[Inputs, Outputs],
         evaluator: CandidateMetricEvaluator[Inputs, Outputs],
-        batch_size: int = 0,
-        epochs: int = 1,
+        samples: int = 0,
+        rounds: int = 1,
         concurrency: int = 1,
-    ) -> LMFunction[Inputs, Outputs]:
-        return syncify(self.atrain)(lmfn, evaluator, batch_size, epochs, concurrency)
+    ) -> TrainResult:
+        return await asyncify(self.train)(lmfn, evaluator, samples, rounds, concurrency)
 
-    def candidates(self, _: LMFunction[Inputs, Outputs], batch_size: int):
-        if batch_size > len(self.demoset):
+    def candidates(self, _: LMFunction[Inputs, Outputs], samples: int):
+        max_samples = factorial(len(self.demoset))
+        if samples > max_samples:
             log.warn(
-                "Batch size is greater than the demos, using demoset size",
-                demoset_size=len(self.demoset),
-                batch_size=batch_size,
+                "samples >= factorial(len(demoset)), using factorial(len(demoset))",
+                max_samples=max_samples,
+                samples=samples,
             )
-            batch_size = len(self.demoset)
+            samples = max_samples
 
-        for _ in range(batch_size):
+        for _ in range(samples):
             demos = tuple(self.random.sample(self.demoset, k=self.shots))
             yield LMZenbase(demos=demos)

@@ -17,7 +17,7 @@ from zenbase.helpers.parea import ZenParea
 from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
 from zenbase.types import LMRequest, deflm
 
-BATCH_SIZE = 2
+SAMPLES = 2
 SHOTS = 3
 TESTSET_SIZE = 5
 
@@ -106,16 +106,13 @@ def test_parea_lcel_labeled_few_shot(
     parea: Parea,
     testset: list,
 ):
-    scores = []
-    optim.events.on("experiment", lambda e: scores.append(e.evals["score"]))
-
-    fn = optim.train(
+    fn, candidates = optim.train(
         langchain_chain,
         evaluator=ZenParea.metric_evaluator(data=testset, n_workers=2, p=parea),
-        batch_size=BATCH_SIZE,
-        epochs=1,
+        samples=SAMPLES,
+        rounds=1,
     )
 
     assert fn is not None
-    assert any(scores)
-    assert next(s for s in scores if s >= 0.5)
+    assert any(candidates)
+    assert next(e for e in candidates if e.evals["score"] >= 0.5)

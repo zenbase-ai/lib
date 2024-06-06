@@ -47,7 +47,7 @@ def asyncify(
     *,
     cancellable: bool = True,
     limiter: anyio.CapacityLimiter | None = None,
-) -> Callable[I_ParamSpec, O_Retval]:
+) -> Callable[I_ParamSpec, Awaitable[O_Retval]]:
     if inspect.iscoroutinefunction(func):
         return func
 
