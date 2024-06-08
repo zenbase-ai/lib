@@ -68,7 +68,7 @@ def dummy_evalfn(fn: LMFunction):
 
 def test_training(optim: LabeledFewShot):
     # Train the dummy function
-    trained_lmfn, candidates = optim.train(
+    trained_lmfn, candidates = optim.perform(
         dummy_lmfn,
         dummy_evalfn,
         rounds=1,
@@ -86,7 +86,7 @@ def test_training(optim: LabeledFewShot):
 @pytest.mark.anyio
 async def test_async_training(optim: LabeledFewShot):
     # Train the dummy function
-    trained_dummy_lmfn, candidates = await optim.atrain(
+    trained_dummy_lmfn, candidates = await optim.aperform(
         dummy_lmfn,
         dummy_evalfn,
         rounds=1,

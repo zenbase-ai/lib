@@ -86,7 +86,7 @@ def test_lunary_lcel_labeled_few_shot(
     optim: LabeledFewShot,
     evalset: list,
 ):
-    fn, candidates = optim.train(
+    fn, candidates = optim.perform(
         langchain_chain,
         evaluator=ZenLunary.metric_evaluator(
             checklist="exact-match",

@@ -24,7 +24,7 @@ class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
         assert 1 <= self.shots <= len(self.demoset)
 
     @tracer.start_as_current_span("train")
-    def train(
+    def perform(
         self,
         function: LMFunction[Inputs, Outputs],
         evaluator: CandidateMetricEvaluator[Inputs, Outputs],
@@ -62,7 +62,7 @@ class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
 
         return self.TrainResult(best, candidates)
 
-    async def atrain(
+    async def aperform(
         self,
         lmfn: LMFunction[Inputs, Outputs],
         evaluator: CandidateMetricEvaluator[Inputs, Outputs],
@@ -70,7 +70,9 @@ class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
         rounds: int = 1,
         concurrency: int = 1,
     ) -> TrainResult:
-        return await asyncify(self.train)(lmfn, evaluator, samples, rounds, concurrency)
+        return await asyncify(self.perform)(
+            lmfn, evaluator, samples, rounds, concurrency
+        )
 
     def candidates(self, _: LMFunction[Inputs, Outputs], samples: int):
         max_samples = factorial(len(self.demoset))

@@ -20,9 +20,10 @@ class LMDemo[Inputs: dict, Outputs: dict]:
 
 @dataclass(frozen=True)
 class LMZenbase[Inputs: dict, Outputs: dict]:
-    instructions: list[str] = field(default_factory=list)
-    dos: list[str] = field(default_factory=list)
-    donts: list[str] = field(default_factory=list)
+    # TODO: These are the thing that you can optimize later ( for later inspirations )
+    # instructions: list[str] = field(default_factory=list)
+    # dos: list[str] = field(default_factory=list)
+    # donts: list[str] = field(default_factory=list)
     demos: list[LMDemo[Inputs, Outputs]] = field(default_factory=list)
 
 
@@ -60,7 +61,7 @@ class LMFunction[Inputs: dict, Outputs: dict]:
     __qualname__: str
     __doc__: str
     __signature__: inspect.Signature
-    zenbase: LMZenbase
+    zenbase: LMZenbase[Inputs, Outputs]
     history: deque[LMCall[Inputs, Outputs]]
 
     def __init__(
@@ -102,7 +103,12 @@ class LMFunction[Inputs: dict, Outputs: dict]:
         )
         return response
 
-    async def __call__(
+    def __call__(self, inputs: Inputs = {}, *args, **kwargs) -> Outputs:
+        request = self.prepare_request(inputs)
+        response = syncify(self.fn)(request, *args, **kwargs)
+        return self.process_response(request, response)
+
+    async def coroutine(
         self,
         inputs: Inputs = {},
         *args,
@@ -110,11 +116,6 @@ class LMFunction[Inputs: dict, Outputs: dict]:
     ) -> Outputs:
         request = self.prepare_request(inputs)
         response = await asyncify(self.fn)(request, *args, **kwargs)
-        return self.process_response(request, response)
-
-    def call_sync(self, inputs: Inputs = {}, *args, **kwargs) -> Outputs:
-        request = self.prepare_request(inputs)
-        response = syncify(self.fn)(request, *args, **kwargs)
         return self.process_response(request, response)
 
 

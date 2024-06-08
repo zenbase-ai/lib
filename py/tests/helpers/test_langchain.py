@@ -109,7 +109,7 @@ def test_langsmith_lcel_labeled_few_shot(
         answer = chain.invoke(request.inputs)
         return {"answer": answer}
 
-    fn, candidates = optim.train(
+    fn, candidates = optim.perform(
         langchain_chain,
         evaluator=ZenLangSmith.metric_evaluator(
             data=evalset,
@@ -148,6 +148,7 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
                 "content": "You are an expert math solver. Your answer must be just the number with no separators, and nothing else. Follow the format of the examples. Think step by step. Respond with a JSON object.",
             },
         ]
+
         for demo in request.zenbase.demos:
             messages += [
                 {"role": "user", "content": json.dumps(demo.inputs)},
@@ -164,7 +165,7 @@ async def test_langsmith_openai_json_response_labeled_few_shot(
 
         return json.loads(response.choices[0].message.content)
 
-    fn, candidates = await optim.atrain(
+    fn, candidates = await optim.aperform(
         openai_json_response,
         evaluator=ZenLangSmith.metric_evaluator(
             data=evalset,

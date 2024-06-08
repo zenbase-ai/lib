@@ -22,4 +22,4 @@ def test_lm_function_refine():
 @pytest.mark.anyio
 async def test_lm_function_async():
     fn = deflm(lambda r: r.inputs)
-    assert fn.call_sync({"answer": 42}) == await fn({"answer": 42})
+    assert fn({"answer": 42}) == await fn.coroutine({"answer": 42})

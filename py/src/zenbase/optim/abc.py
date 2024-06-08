@@ -14,10 +14,10 @@ class LMOptim[Inputs: dict, Outputs: dict](ABC):
     events: AsyncIOEventEmitter = field(default_factory=AsyncIOEventEmitter)
 
     @abstractmethod
-    def train(self, function: LMFunction[Inputs, Outputs], *args, **kwargs):
-        return syncify(alist)(self.atrain(function, *args, **kwargs))
+    def perform(self, function: LMFunction[Inputs, Outputs], *args, **kwargs):
+        return syncify(alist)(self.aperform(function, *args, **kwargs))
 
     @abstractmethod
-    async def atrain(
+    async def aperform(
         self, function: LMFunction[Inputs, Outputs], *args, **kwargs
     ) -> LMFunction[Inputs, Outputs]: ...

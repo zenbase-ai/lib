@@ -51,7 +51,7 @@ class ZenLangfuse:
         ) -> CandidateMetricResult[Inputs, Outputs]:
             @observe()
             def run_and_evaluate(demo: LMDemo):
-                outputs = function.call_sync(demo.inputs)
+                outputs = function(demo.inputs)
                 evals = evaluate(outputs, demo, langfuse=langfuse)
                 return evals
 

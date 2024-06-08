@@ -33,7 +33,7 @@ class ZenLangSmith:
             function: LMFunction[Inputs, Outputs],
         ) -> CandidateMetricResult[Inputs, Outputs]:
             experiment_results = evaluate(
-                function.call_sync,
+                function,
                 experiment_prefix=gen_random_name(),
                 metadata={
                     **metadata,

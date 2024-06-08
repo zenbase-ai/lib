@@ -97,6 +97,25 @@ def langchain_chain(request: LMRequest):
 
     print("Mathing...")
     answer = chain.invoke(request.inputs)
+
+    chain_2 = (
+        ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are the verifier",
+                ),
+                ("user", "the question is: {question} and the answer is {answer}, is it right? answer with yes or no."),
+            ]
+        )
+        | ChatOpenAI(model="gpt-3.5-turbo")
+        | StrOutputParser()
+    )
+
+    print("Mathing...")
+    new_answer = chain_2.invoke({'question': request.inputs['question'], 'answer': answer})
+    print(new_answer)
+
     return answer
 
 
@@ -106,7 +125,7 @@ def test_parea_lcel_labeled_few_shot(
     parea: Parea,
     evalset: list,
 ):
-    fn, candidates = optim.train(
+    fn, candidates = optim.perform(
         langchain_chain,
         evaluator=ZenParea.metric_evaluator(data=evalset, n_workers=2, p=parea),
         samples=SAMPLES,
@@ -116,3 +135,5 @@ def test_parea_lcel_labeled_few_shot(
     assert fn is not None
     assert any(candidates)
     assert next(e for e in candidates if 0.5 <= e.evals["score"] <= 1)
+
+

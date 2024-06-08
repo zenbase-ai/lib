@@ -109,7 +109,7 @@ def score_answer(answer: str, demo: LMDemo, langfuse: Langfuse) -> MetricEvals:
 
 @pytest.mark.helpers
 def test_langfuse_lcel_labeled_few_shot(optim: LabeledFewShot, evalset: list):
-    fn, candidates = optim.train(
+    fn, candidates = optim.perform(
         langchain_chain,
         evaluator=ZenLangfuse.metric_evaluator(evalset, evaluate=score_answer),
         samples=SAMPLES,

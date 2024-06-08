@@ -39,7 +39,7 @@ class ZenLunary:
             function: LMFunction[Inputs, Outputs]
         ) -> CandidateMetricResult[Inputs, Outputs]:
             def run_and_evaluate(item: lunary.DatasetItem):
-                response = function.call_sync(item.input)
+                response = function(item.input)
                 return lunary.evaluate(
                     checklist,
                     input=item.input,
