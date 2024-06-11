@@ -9,8 +9,8 @@ from tenacity import (
 )
 import pytest
 import lunary
-from zenbase.helpers.lunary import ZenLunary
 
+from zenbase.helpers.lunary import ZenLunary
 from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
 from zenbase.types import LMRequest, deflm
 
@@ -82,10 +82,7 @@ def langchain_chain(request: LMRequest):
 
 
 @pytest.mark.helpers
-def test_lunary_lcel_labeled_few_shot(
-    optim: LabeledFewShot,
-    evalset: list,
-):
+def test_lunary_lcel_labeled_few_shot(optim: LabeledFewShot, evalset: list):
     fn, candidates = optim.perform(
         langchain_chain,
         evaluator=ZenLunary.metric_evaluator(

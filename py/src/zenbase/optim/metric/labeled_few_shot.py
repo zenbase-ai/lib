@@ -13,9 +13,9 @@ log = get_logger(__name__)
 
 @dataclass(kw_only=True)
 class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
-    class TrainResult(NamedTuple):
-        best: LMFunction[Inputs, Outputs]
-        candidates: list[CandidateMetricResult]
+    class Result(NamedTuple):
+        best_function: LMFunction[Inputs, Outputs]
+        candidate_results: list[CandidateMetricResult]
 
     demoset: list[LMDemo[Inputs, Outputs]]
     shots: int = field(default=5)
@@ -23,32 +23,33 @@ class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
     def __post_init__(self):
         assert 1 <= self.shots <= len(self.demoset)
 
-    @tracer.start_as_current_span("train")
+    @tracer.start_as_current_span("perform")
     def perform(
         self,
-        function: LMFunction[Inputs, Outputs],
+        lmfn: LMFunction[Inputs, Outputs],
         evaluator: CandidateMetricEvaluator[Inputs, Outputs],
+        deps: list[LMFunction[Inputs, Outputs]] = [],
         samples: int = 0,
         rounds: int = 1,
         concurrency: int = 1,
-    ) -> TrainResult:
+    ) -> Result:
         samples = samples or len(self.demoset)
 
-        score = float("-inf")
-        best = function
+        best_score = float("-inf")
+        best_lmfn = lmfn
 
         @tracer.start_as_current_span("run_experiment")
         def run_candidate_zenbase(zenbase: LMZenbase):
-            nonlocal score, best
+            nonlocal best_score, best_lmfn
 
-            candidate_fn = function.refine(zenbase)
+            candidate_fn = lmfn.refine(zenbase)
             candidate_result = evaluator(candidate_fn)
 
             self.events.emit("candidate", candidate_result)
 
-            if candidate_result.evals["score"] > score:
-                score = candidate_result.evals["score"]
-                best = candidate_fn
+            if candidate_result.evals["score"] > best_score:
+                best_score = candidate_result.evals["score"]
+                best_lmfn = candidate_fn
 
             return candidate_result
 
@@ -56,11 +57,11 @@ class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
         for _ in range(rounds):
             candidates += pmap(
                 run_candidate_zenbase,
-                self.candidates(best, samples),
+                self.candidates(best_lmfn, samples),
                 concurrency=concurrency,
             )
 
-        return self.TrainResult(best, candidates)
+        return self.Result(best_lmfn, candidates)
 
     async def aperform(
         self,
@@ -69,12 +70,12 @@ class LabeledFewShot[Inputs: dict, Outputs: dict](LMOptim):
         samples: int = 0,
         rounds: int = 1,
         concurrency: int = 1,
-    ) -> TrainResult:
+    ) -> Result:
         return await asyncify(self.perform)(
             lmfn, evaluator, samples, rounds, concurrency
         )
 
-    def candidates(self, _: LMFunction[Inputs, Outputs], samples: int):
+    def candidates(self, _lmfn: LMFunction[Inputs, Outputs], samples: int):
         max_samples = factorial(len(self.demoset))
         if samples > max_samples:
             log.warn(

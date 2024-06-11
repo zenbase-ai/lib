@@ -5,8 +5,10 @@ from functools import partial
 from typing import Awaitable, Callable
 import inspect
 
+from pyee import AsyncIOEventEmitter
 
-from zenbase.utils import asyncify, id_gen, syncify
+
+from zenbase.utils import asyncify, id_generator, syncify
 
 
 @dataclass(frozen=True)
@@ -20,7 +22,7 @@ class LMDemo[Inputs: dict, Outputs: dict]:
 
 @dataclass(frozen=True)
 class LMZenbase[Inputs: dict, Outputs: dict]:
-    # TODO: These are the thing that you can optimize later ( for later inspirations )
+    # TODO: These are the thing that you can optimize later (for later inspiration)
     # instructions: list[str] = field(default_factory=list)
     # dos: list[str] = field(default_factory=list)
     # donts: list[str] = field(default_factory=list)
@@ -31,7 +33,7 @@ class LMZenbase[Inputs: dict, Outputs: dict]:
 class LMRequest[Inputs: dict, Outputs: dict]:
     zenbase: LMZenbase[Inputs, Outputs]
     inputs: Inputs = field(default_factory=dict)
-    id: str = field(default_factory=id_gen("request"))
+    id: str = field(default_factory=id_generator("request"))
 
 
 @dataclass(frozen=True)
@@ -39,7 +41,7 @@ class LMCall[Inputs: dict, Outputs: dict]:
     function: "LMFunction[Inputs, Outputs]"
     request: LMRequest[Inputs, Outputs]
     outputs: Outputs
-    id: str = field(default_factory=id_gen("call"))
+    id: str = field(default_factory=id_generator("call"))
 
 
 type SyncDef[Inputs: dict, Outputs: dict] = Callable[
@@ -53,7 +55,7 @@ type AsyncDef[Inputs: dict, Outputs: dict] = Callable[
 
 
 class LMFunction[Inputs: dict, Outputs: dict]:
-    gen_id = staticmethod(id_gen("fn"))
+    gen_id = staticmethod(id_generator("fn"))
 
     id: str
     fn: SyncDef[Inputs, Outputs] | AsyncDef[Inputs, Outputs]

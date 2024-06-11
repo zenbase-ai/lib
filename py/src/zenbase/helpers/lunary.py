@@ -21,7 +21,9 @@ class ZenLunary:
 
     @staticmethod
     def dataset_to_demos(dataset: list[lunary.DatasetItem]) -> list[LMDemo]:
-        return [LMDemo(input=item.input, output=item.ideal_output) for item in dataset]
+        return [
+            LMDemo(inputs=item.input, outputs=item.ideal_output) for item in dataset
+        ]
 
     @classmethod
     def metric_evaluator[

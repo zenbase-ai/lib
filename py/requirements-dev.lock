@@ -21,6 +21,7 @@ aiosqlite==0.20.0
     # via arize-phoenix
 alembic==1.13.1
     # via arize-phoenix
+    # via optuna
 annotated-types==0.7.0
     # via pydantic
 anyio==4.4.0
@@ -88,6 +89,8 @@ cleo==2.1.0
     # via poetry
 click==8.1.7
     # via uvicorn
+colorlog==6.8.2
+    # via optuna
 comm==0.2.2
     # via ipykernel
     # via ipywidgets
@@ -347,6 +350,7 @@ numpy==1.26.4
     # via hdbscan
     # via langchain
     # via numba
+    # via optuna
     # via pandas
     # via pyarrow
     # via scikit-learn
@@ -414,6 +418,8 @@ opentelemetry-semantic-conventions==0.46b0
     # via openinference-instrumentation-llama-index
     # via openinference-instrumentation-openai
     # via opentelemetry-sdk
+optuna==3.6.1
+    # via zenbase
 orjson==3.10.3
     # via langsmith
 overrides==7.7.0
@@ -430,6 +436,7 @@ packaging==23.2
     # via langfuse
     # via lunary
     # via nbconvert
+    # via optuna
     # via poetry
     # via pytest
     # via qtconsole
@@ -545,6 +552,7 @@ pyyaml==6.0.1
     # via jupyter-events
     # via langchain
     # via langchain-core
+    # via optuna
     # via vcrpy
 pyzmq==26.0.3
     # via ipykernel
@@ -630,6 +638,7 @@ sqlalchemy==2.0.30
     # via alembic
     # via arize-phoenix
     # via langchain
+    # via optuna
 sqlean-py==3.45.1
     # via arize-phoenix
 stack-data==0.6.3
@@ -672,6 +681,7 @@ tqdm==4.66.4
     # via datasets
     # via huggingface-hub
     # via openai
+    # via optuna
     # via umap-learn
 traitlets==5.14.3
     # via comm

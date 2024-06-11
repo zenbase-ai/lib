@@ -1,5 +1,7 @@
 from anyio._core._eventloop import threadlocals
 from typing import AsyncIterable, Awaitable, Callable, ParamSpec, TypeVar
+from random import Random
+from concurrent.futures import ThreadPoolExecutor
 import anyio
 import asyncio
 import functools
@@ -21,11 +23,15 @@ def get_seed(seed: int | None = None) -> int:
     return seed or int(os.getenv("RANDOM_SEED", 42))
 
 
-def id_gen(prefix: str) -> Callable[[], str]:
+def random_factory(seed: int | None = None) -> Random:
+    return Random(get_seed(seed))
+
+
+def id_generator(prefix: str) -> Callable[[], str]:
     return lambda: str(PKSUID(prefix))
 
 
-def random_name_gen(
+def random_name_generator(
     prefix: str | None = None,
     random_name_generator=Faker().catch_phrase,
 ) -> Callable[[], str]:
@@ -51,6 +57,7 @@ def asyncify(
     if inspect.iscoroutinefunction(func):
         return func
 
+    @functools.wraps(func)
     async def wrapper(
         *args: I_ParamSpec.args, **kwargs: I_ParamSpec.kwargs
     ) -> O_Retval:
@@ -85,7 +92,7 @@ def syncify(
 
 async def amap[
     O
-](func: Callable[..., Awaitable[O]], iterable, *iterables, concurrency=20) -> list[O]:
+](func: Callable[..., Awaitable[O]], iterable, *iterables, concurrency=10) -> list[O]:
     assert concurrency >= 1, "Concurrency must be greater than or equal to 1"
 
     if concurrency == 1:
@@ -106,8 +113,9 @@ async def amap[
     return await asyncio.gather(*[mapper(*args) for args in zip(iterable, *iterables)])
 
 
-def pmap[O](func: Callable[..., O], iterable, *iterables, concurrency=20) -> list[O]:
-    return syncify(amap)(asyncify(func), iterable, *iterables, concurrency=concurrency)
+def pmap[O](func: Callable[..., O], iterable, *iterables, concurrency=10) -> list[O]:
+    with ThreadPoolExecutor(max_workers=concurrency) as pool:
+        return list(pool.map(func, iterable, *iterables))
 
 
 async def alist[O](aiterable: AsyncIterable[O]) -> list[O]:

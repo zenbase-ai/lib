@@ -13,7 +13,7 @@ from zenbase.optim.metric.types import (
     CandidateMetricEvaluator,
 )
 from zenbase.types import LMFunction, LMDemo
-from zenbase.utils import random_name_gen
+from zenbase.utils import random_name_generator
 
 
 class ZenParea:
@@ -44,7 +44,7 @@ class ZenParea:
         assert isinstance(p, Parea)
 
         base_metadata = kwargs.pop("metadata", {})
-        gen_random_name = random_name_gen(kwargs.pop("name", None))
+        gen_random_name = random_name_generator(kwargs.pop("name", None))
 
         def evaluate_candidate(
             function: LMFunction[Inputs, Outputs]

@@ -7,7 +7,7 @@ from zenbase.optim.metric.types import (
     CandidateMetricResult,
     CandidateMetricEvaluator,
 )
-from zenbase.utils import random_name_gen
+from zenbase.utils import random_name_generator
 
 if TYPE_CHECKING:
     from langsmith import schemas
@@ -25,7 +25,7 @@ class ZenLangSmith:
         from langsmith import evaluate
 
         metadata = evaluate_kwargs.pop("metadata", {})
-        gen_random_name = random_name_gen(
+        gen_random_name = random_name_generator(
             evaluate_kwargs.pop("experiment_prefix", None)
         )
 

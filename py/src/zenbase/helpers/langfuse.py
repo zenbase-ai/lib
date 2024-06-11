@@ -1,7 +1,7 @@
 from typing import Callable
 
 from langfuse import Langfuse
-from langfuse.client import Dataset, DatasetItem
+from langfuse.client import Dataset
 
 from zenbase.optim.metric.types import (
     MetricEvals,
@@ -36,7 +36,7 @@ class ZenLangfuse:
     ](
         cls,
         evalset: Dataset,
-        evaluate: Callable[[Outputs, DatasetItem, str], MetricEvals],
+        evaluate: Callable[[Outputs, LMDemo, Langfuse], MetricEvals],
         candidate_evals: MetricEvaluator = default_candidate_evals,
         langfuse: Langfuse | None = None,
         concurrency: int = 20,
