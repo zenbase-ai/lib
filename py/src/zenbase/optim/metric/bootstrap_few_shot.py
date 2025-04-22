@@ -12,7 +12,7 @@ from zenbase.optim.base import LMOptim
 from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
 from zenbase.optim.metric.types import CandidateEvalResult
 from zenbase.types import Inputs, LMDemo, LMFunction, LMZenbase, Outputs
-from zenbase.utils import get_logger, ot_tracer
+from zenbase.utils import get_logger, log_event, ot_tracer
 
 log = get_logger(__name__)
 
@@ -25,17 +25,23 @@ class BootstrapFewShot(LMOptim[Inputs, Outputs]):
 
     shots: int = field(default=5)
     training_set_demos: list[LMDemo[Inputs, Outputs]] | None = None
-    training_set: Any = None  # TODO: it needs to be more generic and pass our Dataset Object here
+    training_set: Any = (
+        None  # TODO: it needs to be more generic and pass our Dataset Object here
+    )
     test_set: Any = None
     validation_set: Any = None
     base_evaluation = None
     best_evaluation = None
-    optimizer_args: Dict[str, dict[str, dict[str, LMDemo]]] = field(default_factory=dict)
+    optimizer_args: Dict[str, dict[str, dict[str, LMDemo]]] = field(
+        default_factory=dict
+    )
     zen_adaptor: Any = None
     evaluator_kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
-        self.training_set_demos = self.zen_adaptor.fetch_dataset_demos(self.training_set)
+        self.training_set_demos = self.zen_adaptor.fetch_dataset_demos(
+            self.training_set
+        )
         self.zen_adaptor.set_evaluator_kwargs(**self.evaluator_kwargs)
         assert 1 <= self.shots <= len(self.training_set_demos)
 
@@ -70,10 +76,14 @@ class BootstrapFewShot(LMOptim[Inputs, Outputs]):
         if not teacher_lm:
             # Create the base LabeledFewShot teacher model
             trace_manager.flush()
-            teacher_lm = self._create_teacher_model(self.zen_adaptor, student_lm, samples, rounds)
+            teacher_lm = self._create_teacher_model(
+                self.zen_adaptor, student_lm, samples, rounds
+            )
 
         # Evaluate and validate the demo set
-        validated_training_set_demos = self._validate_demo_set(self.zen_adaptor, teacher_lm)
+        validated_training_set_demos = self._validate_demo_set(
+            self.zen_adaptor, teacher_lm
+        )
 
         # Run each validated demo to fill up the traces
         trace_manager.flush()
@@ -84,24 +94,39 @@ class BootstrapFewShot(LMOptim[Inputs, Outputs]):
         self.set_optimizer_args(optimized_args)
 
         # Create the optimized function
-        optimized_fn = self._create_optimized_function(student_lm, optimized_args, trace_manager)
+        optimized_fn = self._create_optimized_function(
+            student_lm, optimized_args, trace_manager
+        )
 
         # Evaluate the optimized function
         self.best_evaluation = test_set_evaluator(optimized_fn)
 
         trace_manager.flush()
+
+        log_event(
+            "optimize_bootstrap_few_shot",
+            base_evaluation=self.base_evaluation,
+            best_evaluation=self.best_evaluation,
+        )
+
         return self.Result(best_function=optimized_fn)
 
     def _create_teacher_model(
-        self, zen_adaptor: ZenLangSmith, student_lm: LMFunction, samples: int, rounds: int
+        self,
+        zen_adaptor: ZenLangSmith,
+        student_lm: LMFunction,
+        samples: int,
+        rounds: int,
     ) -> LMFunction:
         evaluator = zen_adaptor.get_evaluator(data=self.validation_set)
-        teacher_lm, _, _ = LabeledFewShot(demoset=self.training_set_demos, shots=self.shots).perform(
-            student_lm, evaluator=evaluator, samples=samples, rounds=rounds
-        )
+        teacher_lm, _, _ = LabeledFewShot(
+            demoset=self.training_set_demos, shots=self.shots
+        ).perform(student_lm, evaluator=evaluator, samples=samples, rounds=rounds)
         return teacher_lm
 
-    def _validate_demo_set(self, zen_adaptor: ZenLangSmith, teacher_lm: LMFunction) -> list[LMDemo]:
+    def _validate_demo_set(
+        self, zen_adaptor: ZenLangSmith, teacher_lm: LMFunction
+    ) -> list[LMDemo]:
         # TODO: here is an issue that we are not removing the actual training set from the task demo
         #  so it is possible of over fitting but it is not a big issue for now,
         #  we should remove them in the trace_manager
@@ -117,11 +142,15 @@ class BootstrapFewShot(LMOptim[Inputs, Outputs]):
         # run the evaluation and get the result of the evaluation
         result = evaluate_demo_set(teacher_lm)
         # find the validated training set that has been passed
-        validated_demo_set = [eval.demo for eval in result.individual_evals if eval.passed]
+        validated_demo_set = [
+            eval.demo for eval in result.individual_evals if eval.passed
+        ]
         return validated_demo_set
 
     @staticmethod
-    def _run_validated_demos(teacher_lm: LMFunction, validated_demo_set: list[LMDemo]) -> None:
+    def _run_validated_demos(
+        teacher_lm: LMFunction, validated_demo_set: list[LMDemo]
+    ) -> None:
         """
         Run each of the validated demos to fill up the traces
 
@@ -151,9 +180,15 @@ class BootstrapFewShot(LMOptim[Inputs, Outputs]):
                     # Sanitize input and output arguments by replacing curly braces with spaces.
                     # This prevents conflicts when using these arguments as keys in template rendering within LangChain.
                     if isinstance(input_args, dict):
-                        input_args = {k: str(v).replace("{", " ").replace("}", " ") for k, v in input_args.items()}
+                        input_args = {
+                            k: str(v).replace("{", " ").replace("}", " ")
+                            for k, v in input_args.items()
+                        }
                     if isinstance(output_args, dict):
-                        output_args = {k: str(v).replace("{", " ").replace("}", " ") for k, v in output_args.items()}
+                        output_args = {
+                            k: str(v).replace("{", " ").replace("}", " ")
+                            for k, v in output_args.items()
+                        }
 
                     each_function_inputs.setdefault(inside_functions, []).append(
                         LMDemo(inputs=input_args, outputs=output_args)
@@ -177,7 +212,9 @@ class BootstrapFewShot(LMOptim[Inputs, Outputs]):
         :param trace_manager: The trace manager that will be used to trace the function
         """
 
-        def optimized_fn_base(request, zenbase, optimized_args_in_fn, trace_manager, *args, **kwargs):
+        def optimized_fn_base(
+            request, zenbase, optimized_args_in_fn, trace_manager, *args, **kwargs
+        ):
             if request is None and "inputs" not in kwargs.keys():
                 raise ValueError("Request or inputs should be passed")
             elif request is None:
@@ -186,7 +223,9 @@ class BootstrapFewShot(LMOptim[Inputs, Outputs]):
 
             new_optimized_args = deepcopy(optimized_args_in_fn)
             with trace_manager.trace_context(
-                "optimized", f"optimized_layer_0_{datetime.now().isoformat()}", new_optimized_args
+                "optimized",
+                f"optimized_layer_0_{datetime.now().isoformat()}",
+                new_optimized_args,
             ):
                 if request is None:
                     return student_lm(*args, **kwargs)
@@ -227,7 +266,10 @@ class BootstrapFewShot(LMOptim[Inputs, Outputs]):
 
     @classmethod
     def load_optimizer_and_function(
-        cls, optimizer_args_file: str, student_lm: LMFunction[Inputs, Outputs], trace_manager: ZenbaseTracer
+        cls,
+        optimizer_args_file: str,
+        student_lm: LMFunction[Inputs, Outputs],
+        trace_manager: ZenbaseTracer,
     ) -> LMFunction[Inputs, Outputs]:
         """
         Load optimizer arguments and create an optimized function.

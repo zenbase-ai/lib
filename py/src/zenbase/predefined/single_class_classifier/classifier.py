@@ -13,9 +13,14 @@ from zenbase.core.managers import ZenbaseTracer
 from zenbase.optim.metric.labeled_few_shot import LabeledFewShot
 from zenbase.optim.metric.types import CandidateEvalResult
 from zenbase.predefined.base.optimizer import BasePredefinedOptimizer
-from zenbase.predefined.single_class_classifier.function_generator import SingleClassClassifierLMFunctionGenerator
-from zenbase.predefined.syntethic_data.single_class_classifier import SingleClassClassifierSyntheticDataExample
+from zenbase.predefined.single_class_classifier.function_generator import (
+    SingleClassClassifierLMFunctionGenerator,
+)
+from zenbase.predefined.syntethic_data.single_class_classifier import (
+    SingleClassClassifierSyntheticDataExample,
+)
 from zenbase.types import Inputs, LMDemo, LMFunction, Outputs
+from zenbase.utils import log_event
 
 
 @dataclass(kw_only=True)
@@ -71,10 +76,20 @@ class SingleClassClassifier(BasePredefinedOptimizer):
         if dataset:
             if isinstance(dataset[0], dict):
                 return [
-                    LMDemo(inputs={"question": item["inputs"]}, outputs={"answer": item["outputs"]}) for item in dataset
+                    LMDemo(
+                        inputs={"question": item["inputs"]},
+                        outputs={"answer": item["outputs"]},
+                    )
+                    for item in dataset
                 ]
             elif isinstance(dataset[0], SingleClassClassifierSyntheticDataExample):
-                return [LMDemo(inputs={"question": item.inputs}, outputs={"answer": item.outputs}) for item in dataset]
+                return [
+                    LMDemo(
+                        inputs={"question": item.inputs},
+                        outputs={"answer": item.outputs},
+                    )
+                    for item in dataset
+                ]
 
     def load_classifier(self, filename: str):
         with open(filename, "rb") as f:
@@ -101,10 +116,18 @@ class SingleClassClassifier(BasePredefinedOptimizer):
         optimizer_result = self._run_optimization(evaluator)
 
         # Evaluate best function
-        self.best_evaluation = self._evaluate_best_function(test_evaluator, optimizer_result)
+        self.best_evaluation = self._evaluate_best_function(
+            test_evaluator, optimizer_result
+        )
 
         # Save last optimizer_result
         self.optimizer_result = optimizer_result
+
+        log_event(
+            "optimize_single_class_classifier",
+            base_evaluation=self.base_evaluation,
+            best_evaluation=self.best_evaluation,
+        )
 
         return optimizer_result
 

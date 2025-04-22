@@ -7,6 +7,7 @@
 #   all-features: false
 #   with-sources: false
 #   generate-hashes: false
+#   universal: false
 
 -e file:.
 aiohttp==3.9.5
@@ -59,7 +60,6 @@ babel==2.15.0
     # via jupyterlab-server
 backoff==2.2.1
     # via langfuse
-    # via posthog
 beautifulsoup4==4.12.3
     # via nbconvert
 bleach==6.1.0
@@ -334,8 +334,6 @@ mdurl==0.1.2
     # via markdown-it-py
 mistune==3.0.2
     # via nbconvert
-monotonic==1.6
-    # via posthog
 more-itertools==10.2.0
     # via jaraco-classes
 msgpack==1.0.8
@@ -495,8 +493,6 @@ poetry-plugin-dotenv==0.6.33
     # via parea-ai
 poetry-plugin-export==1.8.0
     # via poetry
-posthog==3.5.0
-    # via zenbase
 pre-commit==3.7.1
 prometheus-client==0.20.0
     # via jupyter-server
@@ -562,7 +558,6 @@ python-dateutil==2.9.0.post0
     # via faker
     # via jupyter-client
     # via pandas
-    # via posthog
     # via strawberry-graphql
 python-dotenv==1.0.1
     # via braintrust
@@ -616,8 +611,8 @@ requests==2.32.3
     # via lunary
     # via opentelemetry-exporter-otlp-proto-http
     # via poetry
-    # via posthog
     # via requests-toolbelt
+    # via scarf-sdk
     # via tiktoken
 requests-toolbelt==1.0.0
     # via openai-responses
@@ -636,7 +631,9 @@ rich==13.7.1
 rpds-py==0.18.1
     # via jsonschema
     # via referencing
-ruff==0.4.6
+ruff==0.11.6
+scarf-sdk==0.1.2
+    # via zenbase
 scikit-learn==1.5.0
     # via arize-phoenix
     # via hdbscan
@@ -659,7 +656,6 @@ shellingham==1.5.4
 six==1.16.0
     # via asttokens
     # via bleach
-    # via posthog
     # via python-dateutil
     # via rfc3339-validator
 smmap==5.0.1

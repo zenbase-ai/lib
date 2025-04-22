@@ -12,24 +12,20 @@ from anyio._core._eventloop import threadlocals
 from faker import Faker
 from opentelemetry import trace
 from pksuid import PKSUID
-from posthog import Posthog
+from scarf import ScarfEventLogger
 from structlog import get_logger
 
 get_logger: Callable[..., logging.Logger] = get_logger
 ot_tracer = trace.get_tracer("zenbase")
 
 
-def posthog() -> Posthog:
-    if project_api_key := os.getenv("ZENBASE_ANALYTICS_KEY"):
-        client = Posthog(
-            project_api_key=project_api_key,
-            host="https://us.i.posthog.com",
-        )
-        client.identify(os.environ["ZENBASE_ANALYTICS_ID"])
-    else:
-        client = Posthog("")
-        client.disabled = True
-    return client
+event_logger = ScarfEventLogger(
+    endpoint_url="https://zenbase.gateway.scarf.sh",
+)
+
+
+def log_event(name: str, **properties: dict):
+    event_logger.log_event({**properties, "event": name, "package": "zenbase"})
 
 
 def get_seed(seed: int | None = None) -> int:
@@ -74,7 +70,9 @@ def asyncify(
         return func
 
     @functools.wraps(func)
-    async def wrapper(*args: I_ParamSpec.args, **kwargs: I_ParamSpec.kwargs) -> O_Retval:
+    async def wrapper(
+        *args: I_ParamSpec.args, **kwargs: I_ParamSpec.kwargs
+    ) -> O_Retval:
         partial_f = functools.partial(func, *args, **kwargs)
         return await anyio.to_thread.run_sync(
             partial_f,
@@ -119,7 +117,9 @@ async def amap(
         return [await func(*args) for args in zip(iterable, *iterables)]
 
     if concurrency == float("inf"):
-        return await asyncio.gather(*[func(*args) for args in zip(iterable, *iterables)])
+        return await asyncio.gather(
+            *[func(*args) for args in zip(iterable, *iterables)]
+        )
 
     semaphore = asyncio.Semaphore(concurrency)
 

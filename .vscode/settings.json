@@ -8,15 +8,12 @@
     "**/Thumbs.db": true,
     "py/.venv/": true,
     "py/**/__pycache__": true,
-    "py/.pytest_cache/": true
+    "py/.pytest_cache/": true,
+    ".idea/": true
   },
   "python.defaultInterpreterPath": "py/.venv/bin/python",
-  "python.analysis.extraPaths": [
-    "./py/src"
-  ],
-  "python.testing.pytestArgs": [
-    "py"
-  ],
+  "python.analysis.extraPaths": ["./py/src"],
+  "python.testing.pytestArgs": ["py"],
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true
 }

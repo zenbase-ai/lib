@@ -11,9 +11,9 @@ dependencies = [
     "opentelemetry-api>=1.25.0",
     "structlog>=24.2.0",
     "pyee>=11.1.0",
-    "posthog>=3.5.0",
     "cloudpickle>=3.0.0",
     "instructor>=1.3.5",
+    "scarf-sdk>=0.1.2",
 ]
 readme = "README.md"
 requires-python = ">= 3.10"
@@ -34,7 +34,7 @@ addopts = "-m 'not helpers'"
 managed = true
 dev-dependencies = [
     "pytest>=8.2.1",
-    "ruff>=0.4.6",
+    "ruff>=0.11.6",
     "langsmith[vcr]>=0.1.72",
     "pyright>=1.1.365",
     "datasets>=2.19.1",

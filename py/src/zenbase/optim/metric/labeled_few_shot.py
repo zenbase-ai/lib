@@ -5,7 +5,7 @@ from typing import NamedTuple
 from zenbase.optim.base import LMOptim
 from zenbase.optim.metric.types import CandidateEvalResult, CandidateEvaluator
 from zenbase.types import Inputs, LMDemo, LMFunction, LMZenbase, Outputs
-from zenbase.utils import asyncify, get_logger, ksuid, ot_tracer, pmap, posthog
+from zenbase.utils import asyncify, get_logger, log_event, ot_tracer, pmap
 
 log = get_logger(__name__)
 
@@ -47,7 +47,9 @@ class LabeledFewShot(LMOptim[Inputs, Outputs]):
                 candidate_result = evaluator(candidate_fn)
             except Exception as e:
                 log.error("candidate evaluation failed", error=e)
-                candidate_result = CandidateEvalResult(candidate_fn, {"score": float("-inf")})
+                candidate_result = CandidateEvalResult(
+                    candidate_fn, {"score": float("-inf")}
+                )
 
             self.events.emit("candidate", candidate_result)
 
@@ -66,12 +68,10 @@ class LabeledFewShot(LMOptim[Inputs, Outputs]):
                 concurrency=concurrency,
             )
 
-        posthog().capture(
-            distinct_id=ksuid(),
-            event="optimize_labeled_few_shot",
-            properties={
-                "evals": {c.function.id: c.evals for c in candidates},
-            },
+        log_event(
+            "optimize_labeled_few_shot",
+            base_evaluation=min(c.evals["score"] for c in candidates),
+            best_evaluation=max(c.evals["score"] for c in candidates),
         )
 
         return self.Result(best_lmfn, candidates, best_candidate_result)
@@ -84,7 +84,9 @@ class LabeledFewShot(LMOptim[Inputs, Outputs]):
         rounds: int = 1,
         concurrency: int = 1,
     ) -> Result:
-        return await asyncify(self.perform)(lmfn, evaluator, samples, rounds, concurrency)
+        return await asyncify(self.perform)(
+            lmfn, evaluator, samples, rounds, concurrency
+        )
 
     def candidates(self, _lmfn: LMFunction[Inputs, Outputs], samples: int):
         max_samples = factorial(len(self.demoset))
